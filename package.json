@@ -1,0 +1,82 @@
+{
+  "name": "igo-desktop-widget",
+  "productName": "Igo Desktop Widget",
+  "version": "1.0.0",
+  "description": "Masaüstünde yüzen, hızlı erişimli not widget'ı. Modern tasarım ile güçlü not alma deneyimi.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build-win": "electron-builder --win",
+    "build-portable": "electron-builder --win portable",
+    "dist": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "build": {
+    "appId": "com.igo.desktop-widget",
+    "productName": "Igo Desktop Widget",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "nebula_canvas_desktop_widget_edition_html.html",
+      "orb.html",
+      "package.json",
+      "icon.png",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/",
+        "to": "assets/"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.png",
+      "artifactName": "${productName} Setup ${version}.${ext}",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Igo Desktop Widget",
+      "uninstallDisplayName": "Igo Desktop Widget"
+    },
+    "portable": {
+      "artifactName": "${productName} Portable ${version}.${ext}"
+    }
+  },
+  "keywords": [
+    "widget",
+    "notes",
+    "desktop",
+    "electron",
+    "productivity",
+    "igo"
+  ],
+  "author": "Igo Team",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^37.4.0",
+    "electron-builder": "^24.13.3"
+  }
+}

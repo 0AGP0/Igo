@@ -1,0 +1,37 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.igo.desktop-widget
+productName: Igo Desktop Widget
+files:
+  - filter:
+      - main.js
+      - nebula_canvas_desktop_widget_edition_html.html
+      - orb.html
+      - package.json
+      - icon.png
+      - assets/**/*
+extraResources:
+  - from: assets/
+    to: assets/
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  icon: icon.png
+  artifactName: ${productName} Setup ${version}.${ext}
+  requestedExecutionLevel: asInvoker
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Igo Desktop Widget
+  uninstallDisplayName: Igo Desktop Widget
+portable:
+  artifactName: ${productName} Portable ${version}.${ext}
+electronVersion: 37.4.0
