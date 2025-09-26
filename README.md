@@ -95,9 +95,23 @@ Kurulum gerektirmeyen portable versiyonu da mevcuttur: `Igo Desktop Widget Porta
 2. Zoom seviyesini düşürün
 3. Uygulamayı yeniden başlatın
 
+## 🔄 Güncellemeler
+
+Gelecek güncellemeler:
+- Cloud sync desteği
+- Tema seçenekleri
+- Plugin sistemi
+- Mobile app entegrasyonu
+
+## 📄 Lisans
+
+MIT License - Özgürce kullanabilir, değiştirebilir ve dağıtabilirsiniz.
+
+## 👥 Destek
+
+Sorularınız için GitHub Issues kullanın veya igo@example.com'a yazın.
 
 ---
 
 **Igo Desktop Widget v1.0.0** - Modern not alma deneyimi için tasarlandı. 🚀
-
 

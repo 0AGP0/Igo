@@ -1,8 +1,8 @@
 directories:
   output: dist
   buildResources: build
-appId: com.igo.desktop-widget
-productName: Igo Desktop Widget
+appId: com.igo.app
+productName: Igo
 files:
   - filter:
       - main.js
@@ -11,9 +11,14 @@ files:
       - package.json
       - icon.png
       - assets/**/*
-extraResources:
-  - from: assets/
-    to: assets/
+      - src/**/*
+      - build/**/*
+      - notes/**/*
+      - '!src/**/*.md'
+      - '!**/*.log'
+      - '!**/node_modules/**'
+      - '!**/.git/**'
+      - '!**/dist/**'
 win:
   target:
     - target: nsis
@@ -22,16 +27,15 @@ win:
     - target: portable
       arch:
         - x64
-  icon: icon.png
-  artifactName: ${productName} Setup ${version}.${ext}
+  artifactName: Igo Setup ${version}.${ext}
   requestedExecutionLevel: asInvoker
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Igo Desktop Widget
-  uninstallDisplayName: Igo Desktop Widget
+  shortcutName: Igo
+  uninstallDisplayName: Igo
 portable:
-  artifactName: ${productName} Portable ${version}.${ext}
+  artifactName: Igo Portable ${version}.${ext}
 electronVersion: 37.4.0

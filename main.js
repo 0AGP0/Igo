@@ -12,6 +12,9 @@ function getAppDir() {
   return isDev ? __dirname : (process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath));
 }
 
+// Sistem klasörleri - bu klasörler UI'da gösterilmez
+const SYSTEM_FOLDERS = ['todos', '.git', '.vscode', 'node_modules'];
+
 // Markdown render fonksiyonu (main.js için)
 function renderMarkdownMain(text) {
   if (!text) return '';
@@ -25,29 +28,46 @@ function renderMarkdownMain(text) {
   html = html.replace(/&amp;nbsp;/g, '');
   html = html.replace(/&nbsp;/g, '');
   
-  // 1. Tabloları işle
-  // 3 sütunlu tablolar
-  html = html.replace(/\|([^|\n]+)\|([^|\n]+)\|([^|\n]*)\|/g, (match, col1, col2, col3) => {
-    const c1 = col1.trim();
-    const c2 = col2.trim();
-    const c3 = col3.trim();
-    
-    const cell1 = (c1 === '' || c1 === '&nbsp;') ? '' : c1;
-    const cell2 = (c2 === '' || c2 === '&nbsp;') ? '' : c2;
-    const cell3 = (c3 === '' || c3 === '&nbsp;') ? '' : c3;
-    
-    return `<table class="md-table"><tr><td class="md-table-cell">${cell1}</td><td class="md-table-cell">${cell2}</td><td class="md-table-cell">${cell3}</td></tr></table>`;
-  });
+  // Tek tırnak entity'lerini decode et
+  html = html.replace(/&#39;/g, "'");
+  html = html.replace(/&apos;/g, "'");
+  html = html.replace(/&#x27;/g, "'");
   
-  // 2 sütunlu tablolar
-  html = html.replace(/\|([^|\n]+)\|([^|\n]+)\|/g, (match, col1, col2) => {
-    const c1 = col1.trim();
-    const c2 = col2.trim();
+  // Çift encode edilmiş entity'leri decode et
+  html = html.replace(/&amp;#39;/g, "'");
+  html = html.replace(/&amp;quot;/g, '"');
+  
+  // 1. Tabloları işle - tam tablo bloklarını bul ve işle
+  html = html.replace(/(\|[^|\n]*\|[^|\n]*\|[^|\n]*\|[\s\S]*?)(?=\n\n|\n[^|]|\n$|$)/g, (tableBlock) => {
+    // Tablo satırlarını bul
+    const lines = tableBlock.split('\n').filter(line => line.trim().startsWith('|') && line.trim().endsWith('|'));
     
-    const cell1 = (c1 === '' || c1 === '&nbsp;') ? '' : c1;
-    const cell2 = (c2 === '' || c2 === '&nbsp;') ? '' : c2;
+    if (lines.length < 2) return tableBlock; // En az 2 satır olmalı (header + data)
     
-    return `<table class="md-table"><tr><td class="md-table-cell">${cell1}</td><td class="md-table-cell">${cell2}</td></tr></table>`;
+    let tableHtml = '<table class="md-table">';
+    
+    lines.forEach((line, index) => {
+      // Satır içindeki hücreleri bul
+      const cells = line.split('|').slice(1, -1); // İlk ve son boş elementleri kaldır
+      
+      if (index === 1) {
+        // İkinci satır header separator ise atla
+        if (cells.every(cell => /^-+$/.test(cell.trim()))) {
+          return;
+        }
+      }
+      
+      tableHtml += '<tr>';
+      cells.forEach(cell => {
+        const cellContent = cell.trim();
+        const displayContent = (cellContent === '' || cellContent === '&nbsp;') ? '' : cellContent;
+        tableHtml += `<td class="md-table-cell">${displayContent}</td>`;
+      });
+      tableHtml += '</tr>';
+    });
+    
+    tableHtml += '</table>';
+    return tableHtml;
   });
   
   // 2. Linkleri işle
@@ -72,8 +92,8 @@ function renderMarkdownMain(text) {
     return placeholder;
   });
   
-  // Şimdi HTML escape et
-  html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  // Şimdi HTML escape et - sadece gerekli karakterler için
+  // html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); // Bu satır kaldırıldı - HTML entity sorununa neden oluyordu
   
   // Placeholder'ları geri koy
   tablePlaceholders.forEach((table, index) => {
@@ -643,16 +663,19 @@ ipcMain.handle('get-folder-list', () => {
         const stat = fs.statSync(itemPath);
         
         if (stat.isDirectory()) {
-          // Klasör bilgisini ekle
-          folders.push({
-            name: item,
-            path: itemRelativePath,
-            fullPath: itemPath,
-            level: relativePath.split(path.sep).length
-          });
-          
-          // Alt klasörleri recursive olarak tara
-          scanDirectory(itemPath, itemRelativePath);
+          // Sistem klasörlerini hariç tut
+          if (!SYSTEM_FOLDERS.includes(item)) {
+            // Klasör bilgisini ekle
+            folders.push({
+              name: item,
+              path: itemRelativePath,
+              fullPath: itemPath,
+              level: relativePath.split(path.sep).length
+            });
+            
+            // Alt klasörleri recursive olarak tara
+            scanDirectory(itemPath, itemRelativePath);
+          }
         }
       });
     }
@@ -689,18 +712,21 @@ ipcMain.handle('get-folder-structure', () => {
         const stat = fs.statSync(itemPath);
         
         if (stat.isDirectory()) {
-          // Klasör ID'sini oluştur - klasör ismi bazlı (notlarla eşleşmesi için)
-          const folderId = item.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
-          
-          const folder = {
-            id: folderId,
-            name: item,
-            path: itemRelativePath,
-            type: 'folder',
-            children: buildFolderStructure(itemPath, itemRelativePath)
-          };
-          
-          result.push(folder);
+          // Sistem klasörlerini hariç tut
+          if (!SYSTEM_FOLDERS.includes(item)) {
+            // Klasör ID'sini oluştur - klasör ismi bazlı (notlarla eşleşmesi için)
+            const folderId = item.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
+            
+            const folder = {
+              id: folderId,
+              name: item,
+              path: itemRelativePath,
+              type: 'folder',
+              children: buildFolderStructure(itemPath, itemRelativePath)
+            };
+            
+            result.push(folder);
+          }
         }
       });
       
@@ -721,10 +747,21 @@ ipcMain.on('rename-folder', (event, folderData) => {
   const fs = require('fs');
   const appDir = getAppDir();
   const notesDir = path.join(appDir, 'notes');
-  const { oldName, newName } = folderData;
+  const { oldName, newName, parentPath } = folderData;
   
-  const oldPath = path.join(notesDir, oldName.replace(/[<>:"/\\|?*]/g, '_'));
-  const newPath = path.join(notesDir, newName.replace(/[<>:"/\\|?*]/g, '_'));
+  // Alt klasör için tam path kullan
+  let oldPath, newPath;
+  if (parentPath && parentPath !== oldName) {
+    // Alt klasör için: parentPath/oldName -> parentPath/newName
+    oldPath = path.join(notesDir, parentPath.replace(/[<>:"/\\|?*]/g, '_'), oldName.replace(/[<>:"/\\|?*]/g, '_'));
+    newPath = path.join(notesDir, parentPath.replace(/[<>:"/\\|?*]/g, '_'), newName.replace(/[<>:"/\\|?*]/g, '_'));
+  } else {
+    // Ana klasör için
+    oldPath = path.join(notesDir, oldName.replace(/[<>:"/\\|?*]/g, '_'));
+    newPath = path.join(notesDir, newName.replace(/[<>:"/\\|?*]/g, '_'));
+  }
+  
+  console.log('🔍 Klasör yeniden adlandırma:', { oldPath, newPath, parentPath });
   
   try {
     if (fs.existsSync(oldPath)) {
@@ -736,6 +773,41 @@ ipcMain.on('rename-folder', (event, folderData) => {
       
       // Klasörü yeniden adlandır
       fs.renameSync(oldPath, newPath);
+      
+      // Ana klasör yeniden adlandırıldığında alt klasörlerin path'lerini güncelle
+      if (!parentPath) { // Ana klasör ise
+        console.log('📁 Ana klasör yeniden adlandırıldı, alt klasörler güncelleniyor...');
+        
+        // Alt klasörleri bul ve yeniden adlandır
+        const subFolders = fs.readdirSync(newPath).filter(item => {
+          const itemPath = path.join(newPath, item);
+          return fs.statSync(itemPath).isDirectory();
+        });
+        
+        subFolders.forEach(subFolderName => {
+          const oldSubPath = path.join(newPath, subFolderName);
+          const newSubPath = path.join(newPath, subFolderName); // Alt klasör adı değişmiyor, sadece parent path güncelleniyor
+          
+          // Alt klasördeki dosyaların relativePath'lerini güncelle
+          const subFiles = fs.readdirSync(oldSubPath).filter(file => 
+            file.endsWith('.md') || file.endsWith('.txt')
+          );
+          
+          subFiles.forEach(file => {
+            const filePath = path.join(oldSubPath, file);
+            const content = fs.readFileSync(filePath, 'utf8');
+            
+            // Dosya içeriğindeki relativePath referanslarını güncelle
+            // Eski ana klasör adını yeni ana klasör adıyla değiştir
+            const oldFolderNameEscaped = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const relativePathRegex = new RegExp(`(${oldFolderNameEscaped}/)`, 'g');
+            const updatedContent = content.replace(relativePathRegex, `${newName}/`);
+            
+            fs.writeFileSync(filePath, updatedContent, 'utf8');
+            console.log(`📝 Alt klasör dosyası güncellendi: ${subFolderName}/${file}`);
+          });
+        });
+      }
       
       // Klasördeki tüm dosyaların metadata'sını güncelle
       const files = fs.readdirSync(newPath);
@@ -832,20 +904,31 @@ ipcMain.on('delete-folder', (event, folderData) => {
     function deleteFolderRecursive(folderPath) {
       console.log('🗑️ Klasör siliniyor:', folderPath);
       
-      // Klasördeki tüm dosyaları ana klasöre taşı
-      const files = fs.readdirSync(folderPath);
-      files.forEach(file => {
-        if (file.endsWith('.md') || file.endsWith('.txt')) {
-          const oldPath = path.join(folderPath, file);
-          const newPath = path.join(notesDir, file);
+      // Klasördeki tüm dosyaları ve alt klasörleri işle
+      const items = fs.readdirSync(folderPath);
+      items.forEach(item => {
+        const itemPath = path.join(folderPath, item);
+        const stat = fs.statSync(itemPath);
+        
+        if (stat.isDirectory()) {
+          // Alt klasör ise bir üst seviyeye taşı
+          console.log('📁 Alt klasör bir üst seviyeye taşınıyor:', itemPath);
+          const newFolderPath = path.join(notesDir, item);
+          
+          // Alt klasörü taşı
+          fs.renameSync(itemPath, newFolderPath);
+          console.log('📁 Alt klasör taşındı:', item);
+        } else if (item.endsWith('.md') || item.endsWith('.txt')) {
+          // Dosya ise ana klasöre taşı
+          const newPath = path.join(notesDir, item);
           
           // Dosyayı taşı
-          fs.renameSync(oldPath, newPath);
+          fs.renameSync(itemPath, newPath);
           
           // Dosya içeriğindeki klasör ID'sini null yap
           const content = fs.readFileSync(newPath, 'utf8');
           let updatedContent;
-          if (file.endsWith('.txt')) {
+          if (item.endsWith('.txt')) {
             updatedContent = content.replace(
               /<!-- Klasör ID: .+? -->/,
               '<!-- Klasör ID: null -->'
@@ -857,7 +940,7 @@ ipcMain.on('delete-folder', (event, folderData) => {
             );
           }
           fs.writeFileSync(newPath, updatedContent, 'utf8');
-          console.log('📁 Dosya taşındı:', file);
+          console.log('📁 Dosya taşındı:', item);
         }
       });
       
@@ -907,9 +990,12 @@ ipcMain.on('move-note-to-folder', (event, data) => {
         const stat = fs.statSync(itemPath);
         
         if (stat.isDirectory()) {
-          // Alt klasörü recursive olarak tara
-          const result = findNoteFile(itemPath, targetNoteId);
-          if (result) return result;
+          // Sistem klasörlerini hariç tut
+          if (!SYSTEM_FOLDERS.includes(item)) {
+            // Alt klasörü recursive olarak tara
+            const result = findNoteFile(itemPath, targetNoteId);
+            if (result) return result;
+          }
         } else if (stat.isFile() && (item.endsWith('.md') || item.endsWith('.txt'))) {
           // Dosyayı kontrol et
           try {
@@ -1171,6 +1257,11 @@ function cleanHtmlToText(html) {
     .replace(/&lt;/gi, '<')                // &lt; karakterlerini < çevir
     .replace(/&gt;/gi, '>')                // &gt; karakterlerini > çevir
     .replace(/&quot;/gi, '"')              // &quot; karakterlerini " çevir
+    .replace(/&#39;/gi, "'")               // &#39; karakterlerini ' çevir
+    .replace(/&apos;/gi, "'")              // &apos; karakterlerini ' çevir
+    .replace(/&#x27;/gi, "'")              // &#x27; karakterlerini ' çevir
+    .replace(/&amp;#39;/gi, "'")          // &amp;#39; karakterlerini ' çevir (çift encode)
+    .replace(/&amp;quot;/gi, '"')         // &amp;quot; karakterlerini " çevir (çift encode)
     .replace(/<[^>]*>/g, '')               // Kalan tüm HTML etiketlerini kaldır
     .replace(/\n\s*\n\s*\n/g, '\n\n')      // Çoklu satır sonlarını çift satır sonuna çevir
     .replace(/> \n> /g, '> ')              // Çoklu satır blockquote'ları düzelt
@@ -1435,8 +1526,11 @@ ipcMain.on('load-notes-from-files', (event) => {
         const stat = fs.statSync(itemPath);
         
         if (stat.isDirectory()) {
-          // Alt klasörü recursive olarak tara
-          scanDirectory(itemPath, itemRelativePath);
+          // Sistem klasörlerini hariç tut
+          if (!SYSTEM_FOLDERS.includes(item)) {
+            // Alt klasörü recursive olarak tara
+            scanDirectory(itemPath, itemRelativePath);
+          }
         } else if (stat.isFile() && (item.endsWith('.md') || item.endsWith('.txt'))) {
           // Dosyayı işle
           processNoteFile(itemPath, itemRelativePath, item);
@@ -1699,6 +1793,108 @@ ipcMain.on('load-notes-from-files', (event) => {
   }
 });
 
+// Todo dosya sistemi IPC handlers
+ipcMain.on('save-todos-to-file', (event, todoData) => {
+  const fs = require('fs');
+  const appDir = getAppDir();
+  const notesDir = path.join(appDir, 'notes');
+  const todosDir = path.join(notesDir, 'todos');
+  
+  try {
+    // Todos klasörünü oluştur
+    if (!fs.existsSync(todosDir)) {
+      fs.mkdirSync(todosDir, { recursive: true });
+      console.log('📋 Todos klasörü oluşturuldu:', todosDir);
+    }
+    
+    const { todos, positions, nextTodoId } = todoData;
+    
+    // Ana todos dosyasını kaydet
+    const todosFilePath = path.join(todosDir, 'todos.json');
+    const todosContent = JSON.stringify(todos, null, 2);
+    fs.writeFileSync(todosFilePath, todosContent, 'utf8');
+    
+    // Pozisyon dosyasını kaydet
+    const positionsFilePath = path.join(todosDir, 'todo_positions.json');
+    const positionsContent = JSON.stringify(positions, null, 2);
+    fs.writeFileSync(positionsFilePath, positionsContent, 'utf8');
+    
+    // Next ID dosyasını kaydet
+    const nextIdFilePath = path.join(todosDir, 'todo_next_id.json');
+    const nextIdContent = JSON.stringify({ nextTodoId }, null, 2);
+    fs.writeFileSync(nextIdFilePath, nextIdContent, 'utf8');
+    
+    // Yedek dosya oluştur
+    const backupFilePath = path.join(todosDir, 'todos_backup.json');
+    const backupContent = JSON.stringify({
+      todos,
+      positions,
+      nextTodoId,
+      timestamp: new Date().toISOString()
+    }, null, 2);
+    fs.writeFileSync(backupFilePath, backupContent, 'utf8');
+    
+    console.log('📋 Todo\'lar dosyaya kaydedildi:', todos.length, 'todo');
+    event.reply('todos-saved-to-file', { success: true });
+    
+  } catch (error) {
+    console.error('❌ Todo\'lar dosyaya kaydedilemedi:', error);
+    event.reply('todos-saved-to-file', { success: false, error: error.message });
+  }
+});
+
+ipcMain.on('load-todos-from-file', (event) => {
+  const fs = require('fs');
+  const appDir = getAppDir();
+  const notesDir = path.join(appDir, 'notes');
+  const todosDir = path.join(notesDir, 'todos');
+  
+  try {
+    const result = {
+      todos: [],
+      positions: {},
+      nextTodoId: 1,
+      fromLocalStorage: false
+    };
+    
+    // Ana todos dosyasını yükle
+    const todosFilePath = path.join(todosDir, 'todos.json');
+    if (fs.existsSync(todosFilePath)) {
+      const todosContent = fs.readFileSync(todosFilePath, 'utf8');
+      result.todos = JSON.parse(todosContent);
+      console.log('📋 Todo\'lar dosyadan yüklendi:', result.todos.length, 'todo');
+    }
+    
+    // Pozisyon dosyasını yükle
+    const positionsFilePath = path.join(todosDir, 'todo_positions.json');
+    if (fs.existsSync(positionsFilePath)) {
+      const positionsContent = fs.readFileSync(positionsFilePath, 'utf8');
+      result.positions = JSON.parse(positionsContent);
+      console.log('📋 Todo pozisyonları yüklendi:', Object.keys(result.positions).length, 'pozisyon');
+    }
+    
+    // Next ID dosyasını yükle
+    const nextIdFilePath = path.join(todosDir, 'todo_next_id.json');
+    if (fs.existsSync(nextIdFilePath)) {
+      const nextIdContent = fs.readFileSync(nextIdFilePath, 'utf8');
+      const nextIdData = JSON.parse(nextIdContent);
+      result.nextTodoId = nextIdData.nextTodoId || 1;
+    }
+    
+    // Eğer dosyalardan hiç todo yüklenemediyse, localStorage'dan yüklemeyi dene
+    if (result.todos.length === 0) {
+      console.log('📋 Dosyadan todo bulunamadı, localStorage\'dan yükleme denenecek...');
+      result.fromLocalStorage = true;
+    }
+    
+    event.reply('todos-loaded-from-file', { success: true, ...result });
+    
+  } catch (error) {
+    console.error('❌ Todo\'lar dosyadan yüklenemedi:', error);
+    event.reply('todos-loaded-from-file', { success: false, error: error.message });
+  }
+});
+
 // Orb context menu event handlers
 ipcMain.on('minimize-to-tray', () => {
   console.log('Simge durumuna küçültme çağrıldı');
@@ -1836,7 +2032,13 @@ function scanNotesFolderOnStartup() {
     if (!fs.existsSync(notesDir)) {
       console.log('📁 Notes klasörü bulunamadı, oluşturuluyor...');
       fs.mkdirSync(notesDir, { recursive: true });
-      return;
+    }
+    
+    // Todos klasörünü oluştur
+    const todosDir = path.join(notesDir, 'todos');
+    if (!fs.existsSync(todosDir)) {
+      console.log('📋 Todos klasörü oluşturuluyor...');
+      fs.mkdirSync(todosDir, { recursive: true });
     }
     
     console.log('📁 Notes klasörü taranıyor...');
@@ -1851,20 +2053,25 @@ function scanNotesFolderOnStartup() {
       const stat = fs.statSync(itemPath);
       
       if (stat.isDirectory()) {
-        folders.push(item);
-        console.log(`📁 Klasör bulundu: ${item}`);
-        
-        // Alt klasördeki dosyaları da say
-        try {
-          const subItems = fs.readdirSync(itemPath);
-          const subFiles = subItems.filter(subItem => {
-            const subItemPath = path.join(itemPath, subItem);
-            const subStat = fs.statSync(subItemPath);
-            return subStat.isFile() && (subItem.endsWith('.md') || subItem.endsWith('.txt'));
-          });
-          console.log(`  └─ ${subFiles.length} dosya bulundu`);
-        } catch (subError) {
-          console.log(`  └─ Alt klasör okunamadı: ${subError.message}`);
+        // Todos klasörünü hariç tut
+        if (item !== 'todos') {
+          folders.push(item);
+          console.log(`📁 Klasör bulundu: ${item}`);
+          
+          // Alt klasördeki dosyaları da say
+          try {
+            const subItems = fs.readdirSync(itemPath);
+            const subFiles = subItems.filter(subItem => {
+              const subItemPath = path.join(itemPath, subItem);
+              const subStat = fs.statSync(subItemPath);
+              return subStat.isFile() && (subItem.endsWith('.md') || subItem.endsWith('.txt'));
+            });
+            console.log(`  └─ ${subFiles.length} dosya bulundu`);
+          } catch (subError) {
+            console.log(`  └─ Alt klasör okunamadı: ${subError.message}`);
+          }
+        } else {
+          console.log(`📋 ${item} klasörü atlandı (sistem klasörü)`);
         }
       } else if (stat.isFile() && (item.endsWith('.md') || item.endsWith('.txt'))) {
         files.push(item);

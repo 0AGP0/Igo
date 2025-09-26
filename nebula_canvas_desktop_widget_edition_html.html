@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Igo — Desktop Widget Edition</title>
 <link rel="stylesheet" href="src/styles/main.css">
+<link rel="stylesheet" href="src/styles/todo.css">
 <script src="https://cdn.ckeditor.com/ckeditor5/40.1.0/classic/ckeditor.js"></script>
 <style>
 
@@ -34,6 +35,7 @@
         <!-- Tab Headers -->
         <div class="tabs">
           <div class="tab active" data-tab="notes">Not Yönetimi</div>
+          <div class="tab" data-tab="todos">Todo Listesi</div>
           <div class="tab" data-tab="tags">Etiketler</div>
           <div class="tab" data-tab="map">Bilgi Haritası</div>
         </div>
@@ -46,6 +48,31 @@
           </div>
           <div class="folder-list" id="folderList">
             <!-- Klasörler ve notlar buraya gelecek -->
+          </div>
+        </div>
+        
+        <!-- Tab Content: Todo Listesi -->
+        <div class="tab-content" id="tab-todos">
+          <div class="todo-controls">
+            <button class="folder-btn" id="newTodoBtn">+ Yeni Todo</button>
+          </div>
+          
+          <div class="todo-search">
+            <input type="text" id="todoSearchInput" placeholder="Todo ara...">
+            <button class="clear-search" id="clearTodoSearch">×</button>
+          </div>
+          
+          <div class="todo-filters">
+            <div class="todo-filter active" data-filter="all">Tümü</div>
+            <div class="todo-filter" data-filter="high">Yüksek Öncelik</div>
+            <div class="todo-filter" data-filter="medium">Orta Öncelik</div>
+            <div class="todo-filter" data-filter="low">Düşük Öncelik</div>
+          </div>
+          
+          <div id="todoStats"></div>
+          
+          <div class="todo-list" id="todoList">
+            <!-- Todo kartları buraya gelecek -->
           </div>
         </div>
         
@@ -141,6 +168,20 @@
       </div>
     </div>
     
+    <!-- Todo Delete Confirmation Modal -->
+    <div class="delete-modal-overlay" id="deleteTodoModalOverlay" onclick="closeDeleteTodoModal()">
+      <div class="delete-modal" onclick="event.stopPropagation()">
+        <div class="delete-modal-icon">🗑️</div>
+        <div class="delete-modal-title">Todo'yu Sil</div>
+        <div class="delete-modal-message">Bu todo'yu silmek istediğinizden emin misiniz?</div>
+        <div class="delete-modal-note-title" id="deleteModalTodoTitle">Todo Başlığı</div>
+        <div class="delete-modal-buttons">
+          <button class="delete-modal-btn cancel" onclick="closeDeleteTodoModal()">İptal</button>
+          <button class="delete-modal-btn delete" onclick="confirmDeleteTodo()">Sil</button>
+        </div>
+      </div>
+    </div>
+    
     <!-- CKEditor Note Panel -->
     <div class="note-panel-overlay" id="notePanelOverlay">
       <div class="note-panel-container">
@@ -208,7 +249,13 @@
               <strong>Yeni Not:</strong> <kbd>Ctrl</kbd> + <kbd>N</kbd> veya <kbd>+</kbd> butonu
             </div>
             <div class="help-item">
-              <strong>Yeni Klasör:</strong> Sol panelde "Klasör Oluştur" butonu
+              <strong>Yeni Klasör:</strong> Sol panelde "📁 Yeni Klasör" butonu
+            </div>
+            <div class="help-item">
+              <strong>Klasörde Not Ekle:</strong> Klasöre sağ tık → "📝 Not Ekle"
+            </div>
+            <div class="help-item">
+              <strong>Yeni Todo:</strong> Todo sekmesinde "📝 Yeni Todo" butonu
             </div>
             <div class="help-item">
               <strong>Arama:</strong> <kbd>Ctrl</kbd> + <kbd>F</kbd> veya arama kutusu
@@ -275,21 +322,55 @@
             <div class="help-item">
               <strong>Link Oluştur:</strong> Toolbar'da link butonu
             </div>
+            <div class="help-item">
+              <strong>Todo Bağlantısı:</strong> Todo'lar notlarla otomatik bağlantı kurabilir
+            </div>
+          </div>
+          
+          <div class="help-section">
+            <h3>✅ Todo Sistemi</h3>
+            <div class="help-item">
+              <strong>Yeni Todo:</strong> Todo sekmesinde "📝 Yeni Todo" butonu
+            </div>
+            <div class="help-item">
+              <strong>Todo Düzenle:</strong> Todo'ya çift tık veya sağ tık → "Düzenle"
+            </div>
+            <div class="help-item">
+              <strong>Subtask Ekle:</strong> Todo düzenleme panelinde "Alt Görev Ekle"
+            </div>
+            <div class="help-item">
+              <strong>Todo Taşı:</strong> Todo kartını sürükle
+            </div>
+            <div class="help-item">
+              <strong>Todo Sil:</strong> Todo'ya sağ tık → "Sil"
+            </div>
+            <div class="help-item">
+              <strong>Todo Bağlantısı:</strong> Todo'lar notlarla bağlantı kurabilir
+            </div>
+            <div class="help-item">
+              <strong>Todo Renkleri:</strong> Todo'lar klasör renklerini alabilir
+            </div>
           </div>
           
           <div class="help-section">
             <h3>🎨 Klasör İşlemleri</h3>
             <div class="help-item">
-              <strong>Renk Seç:</strong> Klasöre sağ tık → "Renk Değiştir" → Renk paletinden seç
+              <strong>Renk Seç:</strong> Klasöre sağ tık → "🎨 Renk Değiştir" → Renk paletinden seç
             </div>
             <div class="help-item">
               <strong>Not Taşı:</strong> Notu klasöre sürükle
             </div>
             <div class="help-item">
-              <strong>Klasör Sil:</strong> Klasöre sağ tık → "Klasörü Sil"
+              <strong>Klasör Sil:</strong> Klasöre sağ tık → "🗑️ Klasörü Sil"
             </div>
             <div class="help-item">
               <strong>Klasör Taşı:</strong> Klasörü sürükle
+            </div>
+            <div class="help-item">
+              <strong>Alt Klasör:</strong> Klasöre sağ tık → "📁 Alt Klasör Oluştur"
+            </div>
+            <div class="help-item">
+              <strong>Klasörde Not:</strong> Klasöre sağ tık → "📝 Not Ekle"
             </div>
           </div>
           
@@ -321,16 +402,28 @@
               <strong>Not Taşı:</strong> Notu sürükle
             </div>
             <div class="help-item">
+              <strong>Todo Taşı:</strong> Todo kartını sürükle
+            </div>
+            <div class="help-item">
+              <strong>Klasör Taşı:</strong> Klasör kartını sürükle
+            </div>
+            <div class="help-item">
               <strong>Not Boyutlandır:</strong> Notun köşesinden sürükle
             </div>
             <div class="help-item">
-              <strong>Çoklu Seçim:</strong> Boş alanda sürükle (selection box)
+              <strong>Çoklu Seçim:</strong> Boş alanda sürükle (selection box) - Not, Klasör ve Todo kartları
+            </div>
+            <div class="help-item">
+              <strong>Toplu Taşıma:</strong> Çoklu seçim yap → Herhangi bir seçili kartı sürükle
             </div>
             <div class="help-item">
               <strong>Not Sağ Tık:</strong> Context menü (klasör değiştir, sil)
             </div>
             <div class="help-item">
-              <strong>Klasör Sağ Tık:</strong> Context menü (renk değiştir, sil)
+              <strong>Klasör Sağ Tık:</strong> Context menü (not ekle, renk değiştir, sil)
+            </div>
+            <div class="help-item">
+              <strong>Todo Sağ Tık:</strong> Context menü (düzenle, sil)
             </div>
           </div>
           
@@ -356,13 +449,13 @@
           <div class="help-section">
             <h3>📊 Özel Özellikler</h3>
             <div class="help-item">
-              <strong>Pozisyon Koruma:</strong> Notların pozisyonları otomatik kaydedilir
+              <strong>Pozisyon Koruma:</strong> Notların, klasörlerin ve todo'ların pozisyonları otomatik kaydedilir
             </div>
             <div class="help-item">
               <strong>Dosya İzleme:</strong> Notes klasöründeki değişiklikler otomatik algılanır
             </div>
             <div class="help-item">
-              <strong>Multi-Selection:</strong> Birden fazla not seçip toplu işlem yapabilirsiniz
+              <strong>Multi-Selection:</strong> Birden fazla kart seçip toplu işlem yapabilirsiniz (Not, Klasör, Todo)
             </div>
             <div class="help-item">
               <strong>Drag & Drop:</strong> Notları klasörler arası taşıyabilirsiniz
@@ -378,6 +471,18 @@
             </div>
             <div class="help-item">
               <strong>Alt Klasörler:</strong> Klasörlere alt klasör ekleyebilirsiniz
+            </div>
+            <div class="help-item">
+              <strong>Todo Sistemi:</strong> Todo kartları oluşturup yönetebilirsiniz
+            </div>
+            <div class="help-item">
+              <strong>Todo Subtask:</strong> Todo'lara alt görevler ekleyebilirsiniz
+            </div>
+            <div class="help-item">
+              <strong>Todo Bağlantıları:</strong> Todo'lar notlarla bağlantı kurabilir
+            </div>
+            <div class="help-item">
+              <strong>Zoom Popup:</strong> Düşük zoom seviyelerinde kart isimleri popup olarak görünür
             </div>
             <div class="help-item">
               <strong>Anlık Widget Açılma:</strong> Orb'a tıklayınca widget anında açılır
@@ -396,5 +501,26 @@
   </div>
 
 <script src="src/scripts/maintwo.js"></script>
+<script src="src/scripts/todo.js"></script>
+<script>
+// Widget için basit fonksiyonlar
+function createNote() {
+  // Ana uygulamadaki createNote fonksiyonunu çağır
+  if (typeof window.createNoteMain === 'function') {
+    window.createNoteMain();
+  } else {
+    console.log('createNote fonksiyonu bulunamadı');
+  }
+}
+
+function createFolder() {
+  // Ana uygulamadaki createFolder fonksiyonunu çağır
+  if (typeof window.createFolderMain === 'function') {
+    window.createFolderMain();
+  } else {
+    console.log('createFolder fonksiyonu bulunamadı');
+  }
+}
+</script>
 </body>
 </html>
