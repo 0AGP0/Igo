@@ -1,0 +1,1702 @@
+/* ===== TODO SİSTEMİ STİLLERİ ===== */
+
+/* Todo Sekmesi */
+/* Todo tab özel stilleri kaldırıldı - diğer tab'larla aynı olacak */
+
+/* Todo Durum Etiketleri */
+.todo-status-container {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.todo-status {
+  display: inline-block;
+  padding: 3px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.todo-status.açık {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.todo-status.biten {
+  background: rgba(156, 163, 175, 0.2);
+  color: #9ca3af;
+  border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
+/* Todo Tab İçeriği */
+#tab-todos {
+  display: none;
+  flex-direction: column;
+  padding: 6px;
+}
+
+#tab-todos.active {
+  display: flex;
+}
+
+/* Todo Kontrolleri */
+.todo-controls {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.todo-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  background: var(--elev);
+  color: var(--text);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: center;
+  -webkit-app-region: no-drag;
+  transition: all 0.2s ease;
+}
+
+.todo-btn:hover {
+  background: rgba(52, 211, 153, 0.1);
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.todo-btn:active {
+  transform: scale(0.95);
+  background: rgba(52, 211, 153, 0.2);
+}
+
+/* Todo Listesi */
+.todo-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Todo Kartları */
+.todo-card {
+  background: var(--elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  -webkit-app-region: no-drag;
+}
+
+.todo-card:hover {
+  border-color: var(--ok);
+  background: rgba(52, 211, 153, 0.05);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(52, 211, 153, 0.1);
+}
+
+.todo-card.selected {
+  border-color: var(--ok);
+  background: rgba(52, 211, 153, 0.1);
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.3);
+}
+
+/* Todo Header */
+.todo-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* Todo Checkbox */
+.todo-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all 0.3s ease;
+  position: relative;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.todo-checkbox:hover {
+  border-color: var(--ok);
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.1), rgba(52, 211, 153, 0.05));
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.2), inset 0 1px 3px rgba(0,0,0,0.1);
+  transform: scale(1.05);
+}
+
+.todo-checkbox.checked {
+  background: linear-gradient(135deg, var(--ok), #10b981);
+  border-color: var(--ok);
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.todo-checkbox.checked::after {
+  content: '✓';
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* Todo İçerik */
+.todo-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.todo-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 4px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.todo-description {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+  word-wrap: break-word;
+  margin-bottom: 6px;
+}
+
+/* Todo Meta Bilgileri */
+.todo-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.todo-priority {
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.todo-priority.high {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.todo-priority.medium {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.todo-priority.low {
+  background: rgba(52, 211, 153, 0.2);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.todo-date {
+  font-size: 9px;
+  color: var(--muted);
+}
+
+/* Todo Durumu */
+.todo-card.completed {
+  opacity: 0.7;
+  background: rgba(52, 211, 153, 0.05);
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+.todo-card.completed .todo-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.todo-card.completed .todo-description {
+  opacity: 0.6;
+}
+
+/* Todo Bağlantıları */
+.todo-connections {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.todo-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(125, 211, 252, 0.1);
+  color: var(--accent);
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 9px;
+  margin: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(125, 211, 252, 0.2);
+}
+
+.todo-connection:hover {
+  background: rgba(125, 211, 252, 0.2);
+  transform: translateY(-1px);
+}
+
+.todo-connection-icon {
+  font-size: 8px;
+}
+
+/* Todo İstatistikleri */
+.todo-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 10px;
+}
+
+.todo-stat {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  justify-content: center;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.todo-stat-value {
+  color: var(--ok);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.todo-stat-icon {
+  font-size: 9px;
+}
+
+/* Todo Filtreleri */
+.todo-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.todo-filter {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: var(--elev);
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.todo-filter:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.todo-filter.active {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #0b0f14;
+  font-weight: 500;
+}
+
+/* Todo Arama */
+.todo-search {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.todo-search input {
+  flex: 1;
+  background: var(--elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+}
+
+.todo-search input:focus {
+  border-color: var(--ok);
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.todo-search .clear-search {
+  background: var(--elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 10px;
+  -webkit-app-region: no-drag;
+}
+
+.todo-search .clear-search:hover {
+  background: var(--danger);
+  color: white;
+}
+
+/* Todo Modal */
+.todo-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+}
+
+.todo-modal-overlay.show {
+  display: flex;
+}
+
+/* Modal overlay'e tıklamayı engelle */
+.todo-modal-overlay.show {
+  pointer-events: auto;
+}
+
+.todo-modal-overlay.show .todo-modal-compact {
+  pointer-events: auto;
+}
+
+.todo-modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+  -webkit-app-region: no-drag;
+}
+
+.todo-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 16px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.todo-modal-title-icon {
+  color: var(--ok);
+  font-size: 20px;
+}
+
+.todo-form-group {
+  margin-bottom: 16px;
+}
+
+.todo-form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.todo-form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--elev);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  -webkit-app-region: no-drag;
+}
+
+.todo-form-input:focus {
+  border-color: var(--ok);
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.todo-form-textarea {
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.todo-form-select {
+  cursor: pointer;
+}
+
+.todo-priority-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.priority-option {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--elev);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: center;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.priority-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent);
+}
+
+.priority-option.selected {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #0b0f14;
+  font-weight: 500;
+}
+
+.priority-option.high.selected {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.priority-option.medium.selected {
+  background: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.todo-modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.todo-modal-btn {
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--elev);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.todo-modal-btn:hover {
+  background: rgba(255,255,255,.08);
+}
+
+.todo-modal-btn.primary {
+  background: var(--ok);
+  color: #0b0f14;
+  border-color: var(--ok);
+}
+
+.todo-modal-btn.primary:hover {
+  background: #10b981;
+}
+
+/* Alt Görev Stilleri */
+.todo-subtasks-container {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--elev);
+  margin-bottom: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.todo-subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.todo-subtask-item:last-child {
+  margin-bottom: 0;
+}
+
+.todo-subtask-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.todo-subtask-checkbox:hover {
+  border-color: var(--ok);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.todo-subtask-checkbox:checked {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.todo-subtask-checkbox:checked::after {
+  content: '✓';
+  color: white;
+  font-weight: bold;
+  font-size: 10px;
+}
+
+.todo-subtask-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.todo-subtask-input:focus {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+.todo-subtask-remove {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: var(--danger);
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.todo-subtask-remove:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.todo-add-subtask-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.todo-add-subtask-btn:hover {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: rgba(52, 211, 153, 0.05);
+}
+
+/* Todo kartlarında alt görevler */
+.todo-subtasks {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.todo-subtask-item-small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.todo-subtask-item-small:last-child {
+  margin-bottom: 0;
+}
+
+.todo-subtask-item-small.completed {
+  opacity: 0.7;
+}
+
+.todo-subtask-item-small.completed .todo-subtask-text {
+  text-decoration: line-through;
+}
+
+.todo-subtask-checkbox-small {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.todo-subtask-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-subtask-more {
+  font-size: 10px;
+  color: var(--accent);
+  font-style: italic;
+  margin-top: 3px;
+}
+
+/* Todo List Başlık Stilleri */
+.todo-section {
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(125,211,252,0.05);
+  border: 1px solid rgba(125,211,252,0.2);
+  border-radius: 6px;
+}
+
+.todo-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(125,211,252,0.3);
+}
+
+.todo-section-subtasks {
+  margin-top: 6px;
+}
+
+.todo-section-subtasks .todo-subtask-item-small {
+  margin-left: 12px;
+  margin-bottom: 3px;
+  font-size: 11px;
+}
+
+/* Todo Canvas Kartları - Yeni Tasarım */
+.todo-canvas-card {
+  position: absolute;
+  width: 320px;
+  min-height: 200px;
+  height: auto;
+  border: 2px solid #404040;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+  box-shadow: 0 6px 20px rgba(0,0,0,.15), 0 0 0 1px rgba(255,255,255,0.1);
+  overflow: hidden;
+  cursor: grab;
+  z-index: 2;
+  user-select: none;
+  -webkit-app-region: no-drag;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  contain: layout style;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.todo-canvas-card:hover {
+  border-color: var(--ok);
+  box-shadow: 0 6px 24px rgba(52, 211, 153, 0.15), 0 0 0 1px rgba(52, 211, 153, 0.2);
+  transform: translateY(-2px);
+}
+
+.todo-canvas-card.selected {
+  border-color: var(--ok);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.3), 0 4px 16px rgba(0,0,0,.1);
+}
+
+.todo-canvas-card.dragging {
+  z-index: 100;
+  box-shadow: 0 12px 40px rgba(0,0,0,.3);
+  transform: none !important;
+  transition: none !important;
+  cursor: grabbing !important;
+}
+
+/* Todo Canvas Header - Yeni Tasarım */
+.todo-canvas-header {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  background: linear-gradient(135deg, #2a2a2a, #3a3a3a);
+  border-bottom: 1px solid #505050;
+  cursor: grab;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.todo-canvas-header:active {
+  cursor: grabbing;
+}
+
+.todo-canvas-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(52, 211, 153, 0.3), transparent);
+}
+
+.todo-canvas-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(52, 211, 153, 0.4);
+  border-radius: 8px;
+  background: rgba(52, 211, 153, 0.05);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1), 0 1px 2px rgba(52, 211, 153, 0.1);
+}
+
+.todo-canvas-checkbox:hover {
+  border-color: var(--ok);
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.15), rgba(52, 211, 153, 0.08));
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2), inset 0 2px 4px rgba(0,0,0,0.1);
+  transform: scale(1.08);
+}
+
+.todo-canvas-checkbox.checked {
+  background: linear-gradient(135deg, var(--ok), #10b981);
+  border-color: var(--ok);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.4), inset 0 1px 0 rgba(255,255,255,0.3);
+  transform: scale(1.05);
+}
+
+.todo-canvas-checkbox.checked::after {
+  content: '✓';
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+
+.todo-canvas-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 30px !important;
+  color: var(--text);
+  transition: all 0.3s ease;
+  line-height: 1.4;
+  padding: 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+  .todo-canvas-priority {
+    padding: 8px 16px; /* Daha büyük padding */
+    border-radius: 12px; /* Daha yuvarlak */
+    font-size: 14px; /* Daha büyük font */
+    font-weight: 700; /* Daha kalın */
+    text-transform: uppercase;
+    letter-spacing: 1px; /* Daha geniş harf aralığı */
+    flex-shrink: 0;
+    border: 2px solid transparent; /* Border ekle */
+    transition: all 0.2s ease; /* Smooth transition */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); /* Gölge ekle */
+  }
+
+.todo-canvas-priority.high {
+  background: rgba(239, 68, 68, 0.3); /* Daha opak */
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.5); /* Border rengi */
+}
+
+.todo-canvas-priority.medium {
+  background: rgba(245, 158, 11, 0.3); /* Daha opak */
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.5); /* Border rengi */
+}
+
+.todo-canvas-priority.low {
+  background: rgba(52, 211, 153, 0.3); /* Daha opak */
+  color: #6ee7b7;
+  border-color: rgba(52, 211, 153, 0.5); /* Border rengi */
+}
+
+/* Todo kartlarındaki tools menüsü kaldırıldı - sağ tık menüsü kullanılıyor */
+
+/* Todo Canvas Body - Yeni Tasarım */
+.todo-canvas-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.todo-canvas-description {
+  padding: 8px 12px;
+  color: var(--muted);
+  font-size: 20px !important;
+  line-height: 1.4;
+  overflow: hidden;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  border-bottom: 1px solid #505050;
+  flex-shrink: 0;
+  background: #1f1f1f;
+}
+
+.todo-canvas-connections {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: rgba(255,255,255,.02);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.todo-canvas-connection {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(125, 211, 252, 0.2);
+  color: var(--accent);
+  border-radius: 6px;
+  border: 1px solid rgba(125, 211, 252, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.todo-canvas-connection:hover {
+  background: rgba(125, 211, 252, 0.3);
+  transform: translateY(-1px);
+}
+
+/* Todo Canvas Alt Görevler - Yeni Tasarım */
+.todo-canvas-subtasks {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #252525;
+  border-top: 1px solid #505050;
+  min-height: 60px;
+  max-height: none;
+  overflow: visible;
+}
+
+/* Todo Başlık Sistemi */
+.todo-canvas-section {
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(125,211,252,0.05);
+  border: 1px solid rgba(125,211,252,0.2);
+  border-radius: 6px;
+}
+
+.todo-canvas-section-title {
+  font-size: 16px !important;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(125,211,252,0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.todo-canvas-section-title-text {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 16px !important;
+  font-weight: 600;
+  outline: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.todo-canvas-section-title-text:focus {
+  background: rgba(125,211,252,0.1);
+  border: 1px solid rgba(125,211,252,0.3);
+}
+
+.todo-canvas-section-remove {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: var(--danger);
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.todo-canvas-section-remove:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.todo-canvas-section-subtasks {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.todo-canvas-section-subtasks .todo-canvas-subtask {
+  margin-left: 12px;
+  margin-bottom: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(125,211,252,0.1);
+}
+
+.todo-canvas-section-subtasks .todo-canvas-subtask-text {
+  font-size: 16px !important;
+}
+
+.todo-canvas-add-section-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px dashed rgba(125,211,252,0.3);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.todo-canvas-add-section-btn:hover {
+  border-color: var(--accent);
+  background: rgba(125,211,252,0.05);
+  color: var(--accent);
+}
+
+.todo-canvas-add-subtask-to-section-btn {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px dashed rgba(52, 211, 153, 0.3);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ok);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  margin-top: 6px;
+  -webkit-app-region: no-drag;
+}
+
+.todo-canvas-add-subtask-to-section-btn:hover {
+  border-color: var(--ok);
+  background: rgba(52, 211, 153, 0.05);
+  color: var(--ok);
+}
+
+/* Kompakt Todo Modal Tasarımı */
+.todo-modal-compact {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 500px;
+  max-height: 700px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+}
+
+.todo-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(125,211,252,0.1);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.todo-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.todo-modal-title-icon {
+  color: var(--ok);
+  font-size: 18px;
+}
+
+.todo-modal-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.todo-priority-selector-compact {
+  display: flex;
+  gap: 4px;
+}
+
+.priority-option-compact {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--elev);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.priority-option-compact:hover {
+  border-color: var(--accent);
+  background: rgba(125,211,252,0.1);
+}
+
+.priority-option-compact.selected {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #0b0f14;
+}
+
+.priority-option-compact.high.selected {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+
+.priority-option-compact.medium.selected {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: white;
+}
+
+.todo-modal-close {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: var(--danger);
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.todo-modal-close:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.todo-modal-body {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-form-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.todo-title-input-compact {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+}
+
+.todo-title-input-compact:focus {
+  border-color: var(--accent);
+  background: rgba(125,211,252,0.05);
+}
+
+.todo-date-input-compact {
+  padding: 8px 12px;
+  background: var(--elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+  min-width: 120px;
+}
+
+.todo-date-input-compact:focus {
+  border-color: var(--accent);
+}
+
+.todo-description-input-compact {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  resize: vertical;
+  min-height: 40px;
+  font-family: inherit;
+}
+
+.todo-description-input-compact:focus {
+  border-color: var(--accent);
+  background: rgba(125,211,252,0.05);
+}
+
+.todo-sections-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.todo-section-compact {
+  background: rgba(125,211,252,0.05);
+  border: 1px solid rgba(125,211,252,0.2);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.todo-section-header-compact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.todo-section-title-compact {
+  flex: 1;
+  padding: 4px 8px;
+  background: var(--panel);
+  border: 1px solid rgba(125,211,252,0.3);
+  border-radius: 4px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+}
+
+.todo-section-title-compact:focus {
+  background: rgba(125,211,252,0.1);
+  border-color: var(--accent);
+}
+
+.todo-section-remove-compact {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: var(--danger);
+  color: white;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.todo-section-remove-compact:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.todo-section-subtasks-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.todo-subtask-compact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.todo-subtask-input-compact {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 12px;
+  padding: 2px 0;
+}
+
+.todo-subtask-input-compact:focus {
+  background: rgba(255,255,255,0.05);
+  border-radius: 2px;
+  padding: 2px 4px;
+}
+
+.todo-subtask-remove-compact {
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: var(--danger);
+  color: white;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.todo-subtask-remove-compact:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.todo-add-subtask-compact {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px dashed rgba(52, 211, 153, 0.3);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ok);
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.todo-add-subtask-compact:hover {
+  border-color: var(--ok);
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.todo-add-controls {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.todo-add-btn-compact {
+  padding: 6px 12px;
+  border: 1px dashed var(--accent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.todo-add-btn-compact:hover {
+  border-color: var(--accent);
+  background: rgba(125,211,252,0.1);
+}
+
+.todo-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.02);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.todo-delete-btn-compact {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--danger);
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.todo-delete-btn-compact:hover {
+  background: #dc2626;
+  transform: scale(1.05);
+}
+
+.todo-save-btn-compact {
+  padding: 8px 20px;
+  border: none;
+  background: var(--ok);
+  color: #0b0f14;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.todo-save-btn-compact:hover {
+  background: #10b981;
+  transform: translateY(-1px);
+}
+
+.todo-canvas-subtask {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px; /* Padding'i artır */
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.1);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  min-height: 32px; /* Minimum yükseklik ekle */
+  user-select: none; /* Text seçimini engelle */
+}
+
+/* Drag sırasında subtask tıklanamaz olsun */
+.todo-canvas-card.dragging .todo-canvas-subtask {
+  pointer-events: none;
+}
+
+/* Prevent click flag'i varsa da tıklanamaz olsun */
+.todo-canvas-card[data-prevent-click="true"] .todo-canvas-subtask {
+  pointer-events: none;
+}
+
+.todo-canvas-subtask:hover {
+  background: rgba(52, 211, 153, 0.08);
+  border-color: rgba(52, 211, 153, 0.2);
+  transform: translateX(2px);
+}
+
+.todo-canvas-subtask:last-child {
+  margin-bottom: 0;
+}
+
+.todo-canvas-subtask.completed {
+  opacity: 0.6;
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.todo-canvas-subtask.completed .todo-canvas-subtask-text {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.todo-canvas-subtask-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(52, 211, 153, 0.3);
+  border-radius: 4px;
+  background: rgba(52, 211, 153, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  pointer-events: none; /* Checkbox'a tıklamayı engelle, sadece satıra tıklansın */
+}
+
+.todo-canvas-subtask.completed .todo-canvas-subtask-checkbox {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: white;
+}
+
+.todo-canvas-subtask-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px !important;
+  color: var(--text);
+  font-weight: 500;
+  pointer-events: none; /* Text'e tıklamayı engelle, sadece satıra tıklansın */
+}
+
+.todo-canvas-subtask-more {
+  font-size: 10px;
+  color: var(--accent);
+  font-style: italic;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: rgba(125, 211, 252, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(125, 211, 252, 0.2);
+}
+
+/* Todo Canvas Resize */
+.todo-canvas-resize {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid var(--border);
+  border-bottom: 2px solid var(--border);
+  cursor: nwse-resize;
+  z-index: 10;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.todo-canvas-resize:hover {
+  opacity: 1;
+}
+
+.todo-canvas-card.resizing {
+  transition: none !important;
+}
+
+/* Todo Title Popup - Not kartlarıyla aynı stil */
+.todo-title-popup {
+  position: fixed;
+  background: rgba(15, 23, 42, 0.95);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #e2e8f0;
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.05);
+  backdrop-filter: blur(12px);
+  z-index: 2000;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px) scale(0.95);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.todo-title-popup.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.todo-title-popup::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(calc(-50% + var(--arrow-offset, 0px)));
+  border: 5px solid transparent;
+  border-top-color: rgba(15, 23, 42, 0.95);
+  transition: transform 0.1s ease;
+}
+
+.todo-canvas-card.resizing .todo-canvas-body {
+  overflow: hidden;
+}
+
+/* Todo Bağlantı Çizgileri */
+.todo-connection-line {
+  position: absolute;
+  background: rgba(52, 211, 153, 0.6);
+  height: 2px;
+  z-index: 1;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+/* Todo-Not Bağlantı Çizgileri */
+.todo-note-connection {
+  background: #f59e0b !important;
+  opacity: 0.8;
+  height: 3px;
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+.todo-note-connection:hover {
+  background: #fbbf24 !important;
+  opacity: 1;
+  height: 4px;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+}
+
+/* Todo-Klasör Bağlantı Çizgileri */
+.todo-folder-connection {
+  background: #8b5cf6 !important;
+  opacity: 0.7;
+  height: 2px;
+  border-radius: 1px;
+  box-shadow: 0 0 6px rgba(139, 92, 246, 0.3);
+}
+
+.todo-folder-connection:hover {
+  background: #a78bfa !important;
+  opacity: 0.9;
+  height: 3px;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+}
+
+
+
+/* En Spesifik Font Size Override - Not Kartlarıyla Aynı */
+#board .todo-canvas-card .todo-canvas-title {
+  font-size: 30px !important;
+  font-weight: 600 !important;
+}
+
+#board .todo-canvas-card .todo-canvas-description {
+  font-size: 20px !important;
+}
+
+#board .todo-canvas-card .todo-canvas-subtask-text {
+  font-size: 18px !important;
+}
+
+/* Klasör renkli todo kartları */
+.todo-canvas-card.folder-colored {
+  transition: all 0.3s ease;
+}
+
+.todo-canvas-card.folder-colored:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+}
+
+/* Responsive Tasarım */
+@media (max-width: 768px) {
+  .todo-modal {
+    min-width: 90vw;
+    margin: 20px;
+  }
+  
+  .todo-canvas-card {
+    width: 250px;
+    min-height: 120px;
+  }
+  
+  .todo-canvas-title {
+    font-size: 18px !important;
+  }
+  
+  .todo-canvas-description {
+    font-size: 20px !important;
+  }
+}

@@ -1,5 +1,8 @@
+console.log('🚀 [MAIN] main.js başlatıldı!');
+console.log('🚀 [MAIN] Electron modülleri yüklendi!');
 const { app, BrowserWindow, ipcMain, screen, Tray, Menu, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 // ID oluşturma fonksiyonu
 function generateId() {
@@ -37,94 +40,105 @@ function renderMarkdownMain(text) {
   html = html.replace(/&amp;#39;/g, "'");
   html = html.replace(/&amp;quot;/g, '"');
   
-  // 1. Tabloları işle - tam tablo bloklarını bul ve işle
-  html = html.replace(/(\|[^|\n]*\|[^|\n]*\|[^|\n]*\|[\s\S]*?)(?=\n\n|\n[^|]|\n$|$)/g, (tableBlock) => {
-    // Tablo satırlarını bul
-    const lines = tableBlock.split('\n').filter(line => line.trim().startsWith('|') && line.trim().endsWith('|'));
-    
-    if (lines.length < 2) return tableBlock; // En az 2 satır olmalı (header + data)
-    
-    let tableHtml = '<table class="md-table">';
-    
-    lines.forEach((line, index) => {
-      // Satır içindeki hücreleri bul
-      const cells = line.split('|').slice(1, -1); // İlk ve son boş elementleri kaldır
-      
-      if (index === 1) {
-        // İkinci satır header separator ise atla
-        if (cells.every(cell => /^-+$/.test(cell.trim()))) {
-          return;
-        }
-      }
-      
-      tableHtml += '<tr>';
-      cells.forEach(cell => {
-        const cellContent = cell.trim();
-        const displayContent = (cellContent === '' || cellContent === '&nbsp;') ? '' : cellContent;
-        tableHtml += `<td class="md-table-cell">${displayContent}</td>`;
-      });
-      tableHtml += '</tr>';
-    });
-    
-    tableHtml += '</table>';
-    return tableHtml;
+  // 1. Tabloları geçici olarak koru (işaretleyicilerle değiştir)
+  const tables = [];
+  html = html.replace(/(\|[^\n]+\|[^\n]*\n)+/g, (match) => {
+    const tableId = `__TABLE_PLACEHOLDER_${tables.length}__`;
+    tables.push(match);
+    return tableId;
   });
   
   // 2. Linkleri işle
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
   
-  // 3. HTML escape et (tablolar ve linkler hariç)
-  // Önce tabloları ve linkleri koru
-  const tablePlaceholders = [];
-  const linkPlaceholders = [];
+  // 3. Diğer markdown elementleri
+  // Başlıklar - multiline desteği ile (CKEditor stilleri ile)
+  html = html.replace(/^# (.+)$/gm, '<h1 style="font-size: 1.8em; font-weight: 700; color: #7dd3fc; margin: 16px 0 8px 0; line-height: 1.3;">$1</h1>');
+  html = html.replace(/^## (.+)$/gm, '<h2 style="font-size: 1.5em; font-weight: 700; color: #7dd3fc; margin: 14px 0 6px 0; line-height: 1.3;">$1</h2>');
+  html = html.replace(/^### (.+)$/gm, '<h3 style="font-size: 1.3em; font-weight: 600; color: #e9eef5; margin: 12px 0 6px 0; line-height: 1.3;">$1</h3>');
+  html = html.replace(/^#### (.+)$/gm, '<h4 style="font-size: 1.1em; font-weight: 600; color: #e9eef5; margin: 10px 0 4px 0; line-height: 1.3;">$1</h4>');
+  html = html.replace(/^##### (.+)$/gm, '<h5 style="font-size: 1em; font-weight: 600; color: #9ca3af; margin: 8px 0 4px 0; line-height: 1.3;">$1</h5>');
+  html = html.replace(/^###### (.+)$/gm, '<h6 style="font-size: 0.9em; font-weight: 600; color: #9ca3af; margin: 6px 0 4px 0; line-height: 1.3;">$1</h6>');
   
-  // Tablo placeholder'ları
-  html = html.replace(/<table class="md-table">.*?<\/table>/g, (match) => {
-    const placeholder = `__TABLE_${tablePlaceholders.length}__`;
-    tablePlaceholders.push(match);
-    return placeholder;
-  });
-  
-  // Link placeholder'ları
-  html = html.replace(/<a href="[^"]*" target="_blank">[^<]*<\/a>/g, (match) => {
-    const placeholder = `__LINK_${linkPlaceholders.length}__`;
-    linkPlaceholders.push(match);
-    return placeholder;
-  });
-  
-  // Şimdi HTML escape et - sadece gerekli karakterler için
-  // html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); // Bu satır kaldırıldı - HTML entity sorununa neden oluyordu
-  
-  // Placeholder'ları geri koy
-  tablePlaceholders.forEach((table, index) => {
-    html = html.replace(`__TABLE_${index}__`, table);
-  });
-  
-  linkPlaceholders.forEach((link, index) => {
-    html = html.replace(`__LINK_${index}__`, link);
-  });
-  
-  // 4. Diğer markdown elementleri
-  // Başlıklar
-  html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+  // Başlıklardan sonraki fazla boş satırları temizle
+  html = html.replace(/(<\/h[1-6]>)\n+/g, '$1\n');
   
   // Alıntılar
   html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
   
-  // Listeler
-  html = html.replace(/^\s*-\s*(.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+  // Debug için log ekle
   
-  // Checklist
+  // Yatay çizgi (Horizontal Rule) - Daha güçlü regex
+    html = html.replace(/^---\s*$/gm, '<hr style="border: none; height: 2px; background: #7dd3fc; margin: 20px 0; border-radius: 1px; opacity: 0.7;">');
+    html = html.replace(/^\*\*\*\s*$/gm, '<hr style="border: none; height: 2px; background: #7dd3fc; margin: 20px 0; border-radius: 1px; opacity: 0.7;">');
+  
+  // Debug için log ekle
+  
+  // Checklist (önce işle, liste ile karışmasın)
   html = html.replace(/^\s*-\s*\[\s*\]\s*(.*)$/gm, 
     '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox"><span class="checklist-text">$1</span></div>');
   html = html.replace(/^\s*-\s*\[x\]\s*(.*)$/gmi, 
     '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox" checked><span class="checklist-text">$1</span></div>');
   
+  // Listeler - checklist'ten sonra işle
+  // Liste bloklarını bul ve <ul> veya <ol> içine al
+  html = html.split('\n').map((line, i, arr) => {
+    // Checklist zaten işlenmiş mi kontrol et
+    if (line.includes('<div class="checklist-item">')) {
+      return line; // Checklist'i atla
+    }
+    
+    // Numaralı liste kontrolü
+    const isNumberedItem = /^\s*(\d+)\.\s+(.+)$/.test(line);
+    const prevIsNumberedItem = i > 0 && /^\s*(\d+)\.\s+/.test(arr[i-1]);
+    const nextIsNumberedItem = i < arr.length-1 && /^\s*(\d+)\.\s+/.test(arr[i+1]);
+    
+    if (isNumberedItem) {
+      const content = line.replace(/^\s*(\d+)\.\s+(.+)$/, '$2');
+      let result = `<li class="numbered">${content}</li>`;
+      if (!prevIsNumberedItem) result = '<ol>' + result; // Liste başlangıcı
+      if (!nextIsNumberedItem) result = result + '</ol>'; // Liste bitişi
+      return result;
+    }
+    
+    // Nokta liste kontrolü (sadece "-" ile başlayanlar)
+    const isBulletItem = /^\s*-\s+(.+)$/.test(line);
+    
+    if (isBulletItem) {
+      // Önceki liste öğesini bul (boş satırları atla)
+      let prevIsBulletItem = false;
+      for (let j = i - 1; j >= 0; j--) {
+        if (arr[j].trim() === '') continue; // Boş satırı atla
+        prevIsBulletItem = /^\s*-\s+/.test(arr[j]) && !arr[j].includes('<div class="checklist-item">');
+        break;
+      }
+      
+      // Sonraki liste öğesini bul (boş satırları atla)
+      let nextIsBulletItem = false;
+      for (let j = i + 1; j < arr.length; j++) {
+        if (arr[j].trim() === '') continue; // Boş satırı atla
+        nextIsBulletItem = /^\s*-\s+/.test(arr[j]) && !arr[j].includes('<div class="checklist-item">');
+        break;
+      }
+      
+      const content = line.replace(/^\s*-\s+(.+)$/, '$1');
+      let result = `<li class="bullet">${content}</li>`;
+      if (!prevIsBulletItem) result = '<ul>' + result; // Liste başlangıcı
+      if (!nextIsBulletItem) result = result + '</ul>'; // Liste bitişi
+      return result;
+    }
+    
+    return line;
+  }).join('\n');
+  
   // Satır sonları
   html = html.replace(/\n/g, '<br>');
+  
+  // Ardışık <br> tag'lerini temizle (maksimum 1 boş satır)
+  html = html.replace(/(<br>[\s]*){2,}/gi, '<br>');
+  
+  // Başlık ve liste arasındaki <br> temizle
+  html = html.replace(/(<\/h[1-6]>)<br>(<ul>|<ol>)/gi, '$1$2');
   
   // Inline formatlar
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -134,6 +148,38 @@ function renderMarkdownMain(text) {
   // Etiketler ve wikilink'ler
   html = html.replace(/#([a-z0-9ğüşiöçıİĞÜŞİÖÇ\-_]+)(?![^<]*>)/g, '<span class="tagtok">#$1</span>');
   html = html.replace(/\[\[([^\]]+)\]\]/g, '<span class="wikilink" data-link="$1">[[$1]]</span>');
+  
+  // SON: Tabloları geri koy ve render et
+  tables.forEach((tableText, index) => {
+    const tableId = `__TABLE_PLACEHOLDER_${index}__`;
+    const lines = tableText.trim().split('\n').filter(line => line.trim().startsWith('|') && line.trim().endsWith('|'));
+    
+    if (lines.length < 2) {
+      html = html.replace(tableId, tableText); // Tablo değilse olduğu gibi bırak
+      return;
+    }
+    
+    let tableHtml = '<table class="md-table">';
+    
+    lines.forEach((line, lineIndex) => {
+      const cells = line.split('|').slice(1, -1); // İlk ve son boş elementleri kaldır
+      
+      // İkinci satır separator ise atla
+      if (lineIndex === 1 && cells.every(cell => /^[-:\s]+$/.test(cell.trim()))) {
+        return;
+      }
+      
+      tableHtml += '<tr>';
+      cells.forEach(cell => {
+        const cellContent = cell.trim();
+        tableHtml += `<td class="md-table-cell">${cellContent}</td>`;
+      });
+      tableHtml += '</tr>';
+    });
+    
+    tableHtml += '</table>';
+    html = html.replace(tableId, tableHtml);
+  });
   
   return html;
 }
@@ -163,15 +209,112 @@ function createMainWindow() {
     show: false, // Başlangıçta gizli - anında açılma için
     backgroundColor: '#00000000',
     hasShadow: false,
-    skipTaskbar: true,
-    alwaysOnTop: true
+    skipTaskbar: true
+  });
+  
+  // F11 tuşunu engelle - before-input-event ile
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F11') {
+      event.preventDefault();
+      console.log('🚫 F11 tuşu engellendi - sadece buton kullanın');
+    }
   });
 
   mainWindow.loadFile('nebula_canvas_desktop_widget_edition_html.html');
   
   mainWindow.once('ready-to-show', () => {
     console.log('Widget penceresi hazır (ekran dışında)');
+    
+    // localStorage'dan Always on Top ayarını oku ve uygula
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const appDir = getAppDir();
+      const settingsPath = path.join(appDir, 'settings.json');
+      
+      let shouldBeAlwaysOnTop = true; // Varsayılan değer
+      
+      if (fs.existsSync(settingsPath)) {
+        const settingsData = fs.readFileSync(settingsPath, 'utf8');
+        const settings = JSON.parse(settingsData);
+        shouldBeAlwaysOnTop = settings.alwaysOnTop !== undefined ? settings.alwaysOnTop : true;
+      }
+      
+      // Widget'ı ayarlara göre en üstte tut - orb'tan daha düşük seviyede
+      mainWindow.setAlwaysOnTop(shouldBeAlwaysOnTop, 'pop-up');
+      console.log('🔝 Widget Always on Top ayarı uygulandı:', shouldBeAlwaysOnTop);
+      
+    } catch (error) {
+      console.error('❌ Always on Top ayarı yüklenemedi, varsayılan kullanılıyor:', error);
+    }
+    
+    // Widget drag tracking'i ayarla
+    setupWidgetDragTracking();
+    
     // Widget başlangıçta ekran dışında - hızlı açılma için hazır
+  });
+
+  // Widget monitörler arası taşındığında alwaysOnTop seviyesini koru
+  // Flicker'ı önlemek için debounce kullan
+  let moveTimeout;
+  mainWindow.on('move', () => {
+    if (mainWindow && mainWindow.isVisible()) {
+      // Önceki timeout'u temizle
+      if (moveTimeout) {
+        clearTimeout(moveTimeout);
+      }
+      
+      // Hareket bittiğinde seviyeleri ayarla
+      moveTimeout = setTimeout(() => {
+        // Orb'ın seviyesini koru - widget'tan üstte kalması için
+        if (orbWindow) {
+          orbWindow.setAlwaysOnTop(true, 'screen-saver');
+        }
+      }, 100); // 100ms bekle - hareket bitince ayarla
+    }
+  });
+  
+  // Widget'a focus geldiğinde orb'ın seviyesini koru (flicker'ı önlemek için debounce)
+  let focusTimeout;
+  mainWindow.on('focus', () => {
+    if (orbWindow) {
+      if (focusTimeout) {
+        clearTimeout(focusTimeout);
+      }
+      focusTimeout = setTimeout(() => {
+        // Orb seviyesi korunuyor
+      }, 50);
+    }
+  });
+  
+  // Widget'a mouse ile tıklandığında orb'ın seviyesini koru (flicker'ı önlemek için debounce)
+  let clickTimeout;
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'mouseDown') {
+      if (orbWindow) {
+        if (clickTimeout) {
+          clearTimeout(clickTimeout);
+        }
+        clickTimeout = setTimeout(() => {
+          // Orb seviyesi korunuyor
+        }, 50);
+      }
+    }
+  });
+  
+  mainWindow.on('close', (event) => {
+    // Widget çarpıdan kapatıldığında orb'a bildir
+    console.log('Widget çarpıdan kapatılıyor');
+    
+    // Orb'a widget'ın kapandığını bildir
+    if (orbWindow) {
+      orbWindow.webContents.send('widget-closed');
+    }
+    
+    // Widget'ı gizle ama kapatma
+    event.preventDefault();
+    mainWindow.hide();
+    mainWindow.setPosition(-2000, -2000); // Ekran dışına taşı
   });
 
   mainWindow.on('closed', () => {
@@ -205,13 +348,30 @@ function createOrbWindow() {
 
   orbWindow.loadFile('orb.html');
   
+  // Orb'dan gelen console.log'ları yakala
+  orbWindow.webContents.on('console-message', (event, level, message) => {
+    console.log(`[ORB] ${message}`);
+  });
+  
   orbWindow.once('ready-to-show', () => {
     console.log('Orb penceresi hazır');
+    
+    // Orb'ı en üstte tut - widget'tan da üstte
+    // orbWindow.setAlwaysOnTop(true, 'screen-saver'); // Gereksiz - sadece gerektiğinde ayarlanacak
     
     // Sadece orb alanında mouse eventi kabul et, geri kalanını yok say
     orbWindow.setIgnoreMouseEvents(true, { forward: true });
     
     orbWindow.show();
+    
+    // Orb'a başlangıç widget durumunu gönder
+    setTimeout(() => {
+      if (mainWindow) {
+        const isWidgetVisible = mainWindow.isVisible();
+        console.log(`Orb'a başlangıç durumu gönderiliyor: ${isWidgetVisible ? 'açık' : 'kapalı'}`);
+        orbWindow.webContents.send(isWidgetVisible ? 'widget-opened' : 'widget-closed');
+      }
+    }, 100);
   });
 
   orbWindow.on('closed', () => {
@@ -433,8 +593,9 @@ app.on('activate', () => {
 });
 
 // IPC event handlers
+console.log('🔧 [MAIN] toggle-widget handler tanımlandı');
 ipcMain.on('toggle-widget', () => {
-  console.log('Orb\'dan widget toggle çağrıldı');
+  console.log('🎯 [MAIN] toggle-widget handler çağrıldı!');
   if (mainWindow) {
     if (mainWindow.getPosition()[0] > -1000) { // Ekran içindeyse
       console.log('Widget kapatılıyor');
@@ -464,6 +625,11 @@ ipcMain.on('toggle-widget', () => {
       
       mainWindow.setPosition(-2000, -2000); // Ekran dışına taşı
       mainWindow.webContents.send('main-window-hidden');
+      
+      // Orb'a da widget'ın kapandığını bildir
+      if (orbWindow) {
+        orbWindow.webContents.send('widget-closed');
+      }
     } else {
       console.log('Widget açılıyor');
       
@@ -473,24 +639,76 @@ ipcMain.on('toggle-widget', () => {
       let settings = {};
       try {
         settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+        console.log('📁 Settings dosyası başarıyla okundu:', settings);
       } catch (e) {
+        console.log('⚠️ Settings dosyası okunamadı:', e.message);
         // Varsayılan pozisyon
         const { width, height } = screen.getPrimaryDisplay().workAreaSize;
         settings.widget_rect = { x: width - 1020, y: height - 720, width: 1000, height: 700 };
       }
       
       // Kaydedilmiş pozisyon varsa kullan, yoksa varsayılan
+      const { width, height } = screen.getPrimaryDisplay().workAreaSize;
       const widgetRect = settings.widget_rect || { x: width - 1020, y: height - 720, width: 1000, height: 700 };
       mainWindow.setPosition(widgetRect.x, widgetRect.y);
+      
+      // Widget'ı ayarlara göre en üstte tut
+      try {
+        let shouldBeAlwaysOnTop = true; // Varsayılan değer
+        
+        console.log('🔍 [toggle-widget] Settings dosyasından okunan alwaysOnTop:', settings.alwaysOnTop);
+        
+        if (settings.alwaysOnTop !== undefined) {
+          shouldBeAlwaysOnTop = settings.alwaysOnTop;
+          console.log('✅ [toggle-widget] Settings\'den alwaysOnTop değeri alındı:', shouldBeAlwaysOnTop);
+        } else {
+          console.log('⚠️ [toggle-widget] Settings\'de alwaysOnTop bulunamadı, varsayılan kullanılıyor:', shouldBeAlwaysOnTop);
+        }
+        
+        mainWindow.setAlwaysOnTop(shouldBeAlwaysOnTop, 'pop-up');
+        console.log('🔝 Widget açılırken Always on Top ayarı uygulandı:', shouldBeAlwaysOnTop);
+        
+        // Widget'ın gerçek durumunu kontrol et
+        setTimeout(() => {
+          const actualStatus = mainWindow.isAlwaysOnTop();
+          console.log('🔍 Widget\'ın gerçek Always on Top durumu:', actualStatus);
+        }, 100);
+        
+        // Widget'ın gerçek durumunu kontrol et
+        setTimeout(() => {
+          const actualStatus = mainWindow.isAlwaysOnTop();
+          console.log('🔍 Widget\'ın gerçek Always on Top durumu:', actualStatus);
+        }, 100);
+        
+      } catch (error) {
+        console.error('❌ Always on Top ayarı yüklenemedi, varsayılan kullanılıyor:', error);
+      }
+      
       mainWindow.show(); // Widget'ı göster
       mainWindow.focus();
       
+      // Orb'ın seviyesini koru - widget'tan üstte kalması için (flicker'ı önlemek için debounce)
+      if (orbWindow) {
+        setTimeout(() => {
+          // Orb seviyesi korunuyor
+        }, 100);
+      }
+      
       // Anında mesaj gönder - setImmediate kaldırıldı
       mainWindow.webContents.send('main-window-shown');
+      
+      // Orb'a da widget'ın açıldığını bildir
+      if (orbWindow) {
+        orbWindow.webContents.send('widget-opened');
+      }
     }
   } else {
     console.log('Widget penceresi yok, yeniden oluşturuluyor');
     createMainWindow();
+    // Yeni pencerede drag tracking'i ayarla
+    setTimeout(() => {
+      setupWidgetDragTracking();
+    }, 1000);
   }
 });
 
@@ -502,38 +720,245 @@ ipcMain.on('move-orb', (event, deltaX, deltaY) => {
   }
 });
 
-// Mouse ignore kontrolü
+// Widget manuel drag
+ipcMain.on('move-widget', (event, deltaX, deltaY) => {
+  if (mainWindow) {
+    const [currentX, currentY] = mainWindow.getPosition();
+    mainWindow.setPosition(currentX + deltaX, currentY + deltaY);
+  }
+});
+
+// Tam ekran toggle - manuel durum takibi
+let beforeFullscreenBounds = null;
+let isCurrentlyFullscreen = false; // Manuel flag
+let fullscreenDebounce = null;
+
+ipcMain.on('toggle-fullscreen', (event) => {
+  if (mainWindow) {
+    // Debounce - çok hızlı tıklamaları engelle
+    if (fullscreenDebounce) {
+      clearTimeout(fullscreenDebounce);
+    }
+    
+    fullscreenDebounce = setTimeout(() => {
+      console.log(`🔍 Manuel tam ekran durumu: ${isCurrentlyFullscreen}`);
+      
+      if (!isCurrentlyFullscreen) {
+        // Tam ekrana geç
+        beforeFullscreenBounds = mainWindow.getBounds();
+        console.log(`📦 Kaydedilen boyut: ${beforeFullscreenBounds.width}x${beforeFullscreenBounds.height}`);
+        mainWindow.setFullScreen(true);
+        isCurrentlyFullscreen = true;
+        console.log(`🔳 Tam ekran: AÇIK`);
+      } else {
+        // Tam ekrandan çık
+        mainWindow.setFullScreen(false);
+        isCurrentlyFullscreen = false;
+        console.log(`🔳 Tam ekran: KAPALI`);
+        
+        if (beforeFullscreenBounds) {
+          // Önceki boyut ve pozisyona geri dön
+          setTimeout(() => {
+            mainWindow.setBounds(beforeFullscreenBounds);
+            console.log(`📦 Eski boyuta döndü: ${beforeFullscreenBounds.width}x${beforeFullscreenBounds.height}`);
+            beforeFullscreenBounds = null;
+          }, 50);
+        }
+      }
+    }, 50); // Hızlı geçiş için debounce azaltıldı
+  }
+});
+
+// Mouse ignore kontrolü - Widget drag durumunu takip et
+let widgetIsDragging = false;
+
+// Widget drag durumunu takip et - mainWindow oluşturulduktan sonra
+function setupWidgetDragTracking() {
+  if (mainWindow) {
+    // En basit çözüm: Widget sürüklenirken orb'ı tamamen devre dışı bırak
+    mainWindow.on('will-move', () => {
+      if (!widgetIsDragging) {
+        widgetIsDragging = true;
+        console.log('Widget hareket etmeye başladı - orb devre dışı');
+        
+        // Orb'ı tamamen devre dışı bırak ve gizle
+        if (orbWindow) {
+          orbWindow.webContents.send('widget-drag-started');
+          orbWindow.hide();
+        }
+      }
+    });
+    
+    mainWindow.on('moved', () => {
+      // Hareket bittiğinde biraz bekle ve orb'ı tekrar aktif et
+      setTimeout(() => {
+        if (widgetIsDragging) {
+          widgetIsDragging = false;
+          console.log('Widget hareket bitti - orb aktif');
+          
+          // Orb'ı tekrar göster ve aktif et
+          if (orbWindow) {
+            orbWindow.webContents.send('widget-drag-stopped');
+            orbWindow.show();
+            orbWindow.setIgnoreMouseEvents(true, { forward: true });
+          }
+        }
+      }, 100); // 100ms bekle - daha hızlı geri gel
+    });
+  }
+}
+
 ipcMain.on('orb-mouse-enter', () => {
-  if (orbWindow) {
+  if (orbWindow && !widgetIsDragging) {
     orbWindow.setIgnoreMouseEvents(false); // Mouse eventi kabul et
+    console.log('Orb mouse event\'leri aktif');
+  } else if (widgetIsDragging) {
+    console.log('Widget drag aktif - orb mouse event\'leri devre dışı');
   }
 });
 
 ipcMain.on('orb-mouse-leave', () => {
-  if (orbWindow) {
+  if (orbWindow && !widgetIsDragging) {
     orbWindow.setIgnoreMouseEvents(true, { forward: true }); // Mouse eventi yok say
+    console.log('Orb mouse event\'leri devre dışı');
   }
 });
 
+// Widget drag durumu mesajları - kaldırıldı, artık gerek yok
+
 ipcMain.on('toggle-main-window', () => {
-  console.log('Widget\'dan toggle çağrıldı');
+  console.log('🔧 Widget\'dan toggle çağrıldı');
   if (mainWindow) {
-    if (mainWindow.isVisible()) {
-      console.log('Widget kapatılıyor');
-      mainWindow.hide();
+    if (mainWindow.getPosition()[0] > -1000) { // Ekran içindeyse (toggle-widget ile aynı mantık)
+      console.log('🔧 Widget kapatılıyor');
+      
+      // Mevcut pozisyonu kaydet
+      const currentPos = mainWindow.getPosition();
+      const currentSize = mainWindow.getSize();
+      const fs = require('fs');
+      const settingsPath = path.join(getAppDir(), 'settings.json');
+      
+      let settings = {};
+      try {
+        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      } catch (e) {
+        // Dosya yoksa yeni oluştur
+      }
+      
+      settings.widget_rect = {
+        x: currentPos[0],
+        y: currentPos[1],
+        width: currentSize[0],
+        height: currentSize[1]
+      };
+      
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+      console.log('📍 Widget pozisyonu kaydedildi:', settings.widget_rect);
+      
+      mainWindow.setPosition(-2000, -2000); // Ekran dışına taşı
+      mainWindow.webContents.send('main-window-hidden');
+      
+      // Orb'a da widget'ın kapandığını bildir
+      if (orbWindow) {
+        console.log('🔧 Orb\'a widget-closed mesajı gönderiliyor');
+        orbWindow.webContents.send('widget-closed');
+      } else {
+        console.log('❌ Orb window bulunamadı');
+      }
     } else {
       console.log('Widget açılıyor');
-      mainWindow.show();
+      
+      // Kaydedilmiş pozisyonu yükle
+      const fs = require('fs');
+      const settingsPath = path.join(getAppDir(), 'settings.json');
+      let settings = {};
+      try {
+        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+        console.log('📁 Settings dosyası başarıyla okundu:', settings);
+      } catch (e) {
+        console.log('⚠️ Settings dosyası okunamadı:', e.message);
+        // Varsayılan pozisyon
+        const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+        settings.widget_rect = { x: width - 1020, y: height - 720, width: 1000, height: 700 };
+      }
+      
+      // Kaydedilmiş pozisyon varsa kullan, yoksa varsayılan
+      const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+      const widgetRect = settings.widget_rect || { x: width - 1020, y: height - 720, width: 1000, height: 700 };
+      mainWindow.setPosition(widgetRect.x, widgetRect.y);
+      
+      // Widget'ı ayarlara göre en üstte tut
+      try {
+        let shouldBeAlwaysOnTop = true; // Varsayılan değer
+        
+        console.log('🔍 [toggle-widget] Settings dosyasından okunan alwaysOnTop:', settings.alwaysOnTop);
+        
+        if (settings.alwaysOnTop !== undefined) {
+          shouldBeAlwaysOnTop = settings.alwaysOnTop;
+          console.log('✅ [toggle-widget] Settings\'den alwaysOnTop değeri alındı:', shouldBeAlwaysOnTop);
+        } else {
+          console.log('⚠️ [toggle-widget] Settings\'de alwaysOnTop bulunamadı, varsayılan kullanılıyor:', shouldBeAlwaysOnTop);
+        }
+        
+        mainWindow.setAlwaysOnTop(shouldBeAlwaysOnTop, 'pop-up');
+        console.log('🔝 Widget açılırken Always on Top ayarı uygulandı:', shouldBeAlwaysOnTop);
+        
+        // Widget'ın gerçek durumunu kontrol et
+        setTimeout(() => {
+          const actualStatus = mainWindow.isAlwaysOnTop();
+          console.log('🔍 Widget\'ın gerçek Always on Top durumu:', actualStatus);
+        }, 100);
+        
+        // Widget'ın gerçek durumunu kontrol et
+        setTimeout(() => {
+          const actualStatus = mainWindow.isAlwaysOnTop();
+          console.log('🔍 Widget\'ın gerçek Always on Top durumu:', actualStatus);
+        }, 100);
+        
+      } catch (error) {
+        console.error('❌ Always on Top ayarı yüklenemedi, varsayılan kullanılıyor:', error);
+      }
+      
+      mainWindow.show(); // Widget'ı göster
       mainWindow.focus();
+      
+      // Orb'ın seviyesini koru - widget'tan üstte kalması için (flicker'ı önlemek için debounce)
+      if (orbWindow) {
+        setTimeout(() => {
+          // Orb seviyesi korunuyor
+        }, 100);
+      }
+      
+      // Anında mesaj gönder - setImmediate kaldırıldı
+      mainWindow.webContents.send('main-window-shown');
+      
+      // Orb'a da widget'ın açıldığını bildir
+      if (orbWindow) {
+        orbWindow.webContents.send('widget-opened');
+      }
     }
+  } else {
+    console.log('Widget penceresi yok, yeniden oluşturuluyor');
+    createMainWindow();
+    // Yeni pencerede drag tracking'i ayarla
+    setTimeout(() => {
+      setupWidgetDragTracking();
+    }, 1000);
   }
 });
 
 ipcMain.on('close-main-window', () => {
   if (mainWindow) {
     mainWindow.hide();
+    
+    // Orb'a da widget'ın kapandığını bildir
+    if (orbWindow) {
+      orbWindow.webContents.send('widget-closed');
+    }
   }
 });
+
+// Widget durumu kontrolü - kaldırıldı çünkü gereksiz mesaj gönderiyor
 
 ipcMain.on('save-orb-position', (event, position) => {
   // Orb pozisyonunu kaydet
@@ -619,26 +1044,57 @@ ipcMain.on('create-folder', (event, folderData) => {
 // Always on top durumunu alma
 ipcMain.handle('get-always-on-top', () => {
   try {
-    const isAlwaysOnTop = mainWindow.isAlwaysOnTop();
-    console.log('🔝 Always on top durumu:', isAlwaysOnTop);
-    return isAlwaysOnTop;
+    // Settings.json'dan oku
+    const settingsPath = path.join(getAppDir(), 'settings.json');
+    
+    let settings = {};
+    try {
+      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    } catch (e) {
+      // Dosya yoksa varsayılan
+    }
+    
+    let shouldBeAlwaysOnTop = true; // Varsayılan değer
+    if (settings.alwaysOnTop !== undefined) {
+      shouldBeAlwaysOnTop = settings.alwaysOnTop;
+    }
+    
+    console.log('🔝 Always on top durumu (settings.json\'dan):', shouldBeAlwaysOnTop);
+    return shouldBeAlwaysOnTop;
   } catch (error) {
     console.error('❌ Always on top durumu alınamadı:', error);
-    return false;
+    return true; // Varsayılan
   }
 });
 
 // Always on top ayarlama
 ipcMain.handle('set-always-on-top', (event, enabled) => {
+  console.log('🎯 [MAIN] set-always-on-top handler çağrıldı!', enabled);
   try {
     mainWindow.setAlwaysOnTop(enabled);
     console.log('🔝 Always on top ayarlandı:', enabled);
+    
+    // Ayarları dosyaya kaydet
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const appDir = getAppDir();
+      const settingsPath = path.join(appDir, 'settings.json');
+      
+      const settings = { alwaysOnTop: enabled };
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+      console.log('💾 Always on Top ayarı dosyaya kaydedildi:', enabled);
+    } catch (saveError) {
+      console.error('❌ Ayar dosyaya kaydedilemedi:', saveError);
+    }
+    
     return { success: true, enabled: enabled };
   } catch (error) {
     console.error('❌ Always on top ayarlanamadı:', error);
     return { success: false, error: error.message };
   }
 });
+
 
 // Klasör listesi alma - İç içe klasör desteği ile
 ipcMain.handle('get-folder-list', () => {
@@ -1241,6 +1697,8 @@ function cleanHtmlToText(html) {
   let text = html
     .replace(/<blockquote[^>]*>/gi, '> ')  // <blockquote> açılış etiketini "> " çevir
     .replace(/<\/blockquote>/gi, '\n\n')   // </blockquote> kapanış etiketini çift satır sonuna çevir
+    .replace(/<hr[^>]*class="custom-hr"[^>]*>/gi, '\n---\n')  // CKEditor hr etiketlerini "---" çizgisine çevir
+    .replace(/<hr[^>]*>/gi, '\n---\n')     // Diğer <hr> etiketlerini "---" çizgisine çevir
     .replace(/<br\s*\/?>/gi, '\n')         // <br> etiketlerini satır sonuna çevir
     .replace(/<p[^>]*>/gi, '')             // <p> açılış etiketlerini kaldır
     .replace(/<\/p>/gi, '\n\n')            // </p> kapanış etiketlerini çift satır sonuna çevir
@@ -1324,12 +1782,40 @@ ipcMain.on('save-note-to-file', (event, data) => {
 <!-- METADATA_END -->`;
   } else {
     // .md dosyaları için markdown format
-    fileContent = `# ${note.title}
-
-${contentToSave}
+    // Mevcut dosya varsa metadata'yı koru ve güncelle
+    let existingMetadata = '';
+    let createdAtStr = new Date(note.createdAt).toLocaleString('tr-TR');
+    
+    // note.filePath yoksa relativePath'ten oluştur
+    let actualFilePath = note.filePath;
+    if (!actualFilePath && note.relativePath) {
+      actualFilePath = path.join(notesDir, note.relativePath);
+    }
+    
+    if (actualFilePath && fs.existsSync(actualFilePath)) {
+      try {
+        const existingContent = fs.readFileSync(actualFilePath, 'utf8');
+        // Mevcut metadata'yı bul
+        const metadataMatch = existingContent.match(/---\n\*Oluşturulma: (.+?)\*\n\*Son güncelleme:.*?\*\n\*Not ID:.*?\*\n\*Klasör ID:.*?\*\n(?:---)?$/s);
+        if (metadataMatch) {
+          // Oluşturulma tarihini koru
+          createdAtStr = metadataMatch[1];
+          console.log('✅ Mevcut metadata bulundu, oluşturulma tarihi korunuyor:', createdAtStr);
+        }
+      } catch (e) {
+        console.log('⚠️ Mevcut dosya okunamadı, yeni metadata oluşturulacak');
+      }
+    }
+    
+    // İçerikte zaten başlık varsa tekrar ekleme
+    const hasTitle = contentToSave.trim().startsWith('# ');
+    const titleLine = hasTitle ? '' : `# ${note.title}\n\n`;
+    const finalContent = hasTitle ? contentToSave : contentToSave;
+    
+    fileContent = `${titleLine}${finalContent}
 
 ---
-*Oluşturulma: ${new Date(note.createdAt).toLocaleString('tr-TR')}*
+*Oluşturulma: ${createdAtStr}*
 *Son güncelleme: ${new Date(note.updatedAt).toLocaleString('tr-TR')}*
 *Not ID: ${note.id}*
 *Klasör ID: ${note.folderId ? note.folderId.toLowerCase().replace(/[^a-zA-Z0-9]/g, '') : 'null'}*
@@ -1597,17 +2083,52 @@ ipcMain.on('load-notes-from-files', (event) => {
            if (metadataStartIndex !== -1) {
              text = content.substring(0, metadataStartIndex).trim();
            } else {
-             text = content;
+             // Metadata yoksa, HTML comment'lerden önceki içeriği al
+             const htmlCommentRegex = /<!-- .+? -->/g;
+             const lastCommentMatch = [...content.matchAll(htmlCommentRegex)].pop();
+             
+             if (lastCommentMatch) {
+               // Son HTML comment'den önceki içeriği al
+               text = content.substring(0, lastCommentMatch.index).trim();
+             } else {
+               // Hiç HTML comment yoksa tüm içeriği al
+               text = content;
+             }
            }
         } else {
           // MD dosyaları için metadata'yı parse et
           let metadataStartIndex = -1;
           
-          // Metadata bölümünü bul
+          // Metadata bölümünü bul - * ile başlayan satırları bul ve ondan önceki --- çizgisini metadata başlangıcı olarak kabul et
+          
+          let metadataLineIndex = -1;
           for (let i = 1; i < lines.length; i++) {
-            if (lines[i] === '---') {
-              metadataStartIndex = i;
+            // Metadata formatı: *Oluşturulma: ...* (tek * ile başlayan, ** değil)
+            const trimmedLine = lines[i].trim();
+            if (trimmedLine.startsWith('*') && !trimmedLine.startsWith('**') && trimmedLine.includes(':') && trimmedLine.endsWith('*')) {
+              metadataLineIndex = i;
+              console.log(`🔍 Metadata satırı bulundu: satır ${i}: "${lines[i]}" (${fileName})`);
               break;
+            }
+          }
+          console.log(`🔍 metadataLineIndex: ${metadataLineIndex} (${fileName})`);
+          
+          // Metadata satırından önceki --- çizgisini metadata başlangıcı olarak kabul et
+          // Boş satırları atla
+          if (metadataLineIndex > 0) {
+            for (let i = metadataLineIndex - 1; i >= 1; i--) {
+              console.log(`🔍 Satır ${i} kontrol ediliyor: "${lines[i]}" (${fileName})`);
+              if (lines[i].trim() === '') {
+                console.log(`🔍 Satır ${i} boş, atlanıyor... (${fileName})`);
+                continue; // Boş satırı atla
+              }
+              if (lines[i].trim() === '---') {
+                metadataStartIndex = i;
+                console.log(`✅ Metadata başlangıcı bulundu: satır ${i} (${fileName})`);
+                break;
+              }
+              console.log(`❌ Satır ${i} '---' değil, arama durduruluyor: "${lines[i].trim()}" (${fileName})`);
+              break; // --- değilse dur
             }
           }
           
@@ -1615,31 +2136,17 @@ ipcMain.on('load-notes-from-files', (event) => {
           if (metadataStartIndex > 1) {
             text = lines.slice(1, metadataStartIndex).join('\n');
           } else {
-            // Metadata yoksa başlık hariç tüm içeriği koru ve metadata ekle
+            // Metadata yoksa başlık hariç tüm içeriği koru
             text = lines.slice(1).join('\n');
-            
-            // Metadata yoksa dosyaya ekle
-            const now = new Date();
-            const formattedDate = now.toLocaleString('tr-TR', {
-              day: '2-digit',
-              month: '2-digit', 
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit'
-            });
-            
-            const metadataToAdd = `\n\n---\n*Oluşturulma: ${formattedDate}*\n*Son güncelleme: ${formattedDate}*\n*Not ID: ${noteId}*\n*Klasör ID: null*\n---`;
-            
-            // Dosyayı güncelle
-            fs.writeFileSync(filePath, content + metadataToAdd, 'utf8');
-            console.log(`✅ MD dosyasına metadata eklendi: ${fileName}`);
           }
           
-          // Metadata'yı parse et
+          // Metadata'yı parse et (eğer varsa)
+          console.log(`🔍 Metadata parsing için metadataStartIndex: ${metadataStartIndex} (${fileName})`);
           if (metadataStartIndex !== -1) {
+            console.log(`📋 Metadata bulundu, parsing başlıyor... (${fileName})`);
             for (let i = metadataStartIndex + 1; i < lines.length; i++) {
               const line = lines[i];
+              console.log(`📋 Metadata satırı ${i}: "${line.substring(0, 50)}..."`);
               
               if (line.includes('Oluşturulma') || line.includes('OluÅŸturulma')) {
                 const dateStr = line.match(/\*.*?:\s*(.+?)\*/)?.[1];
@@ -1661,8 +2168,10 @@ ipcMain.on('load-notes-from-files', (event) => {
                 }
               } else if (line.includes('Not ID')) {
                 const idStr = line.match(/\*.*?:\s*(.+?)\*/)?.[1];
-                if (idStr) {
+                console.log(`🔍 Not ID regex match: "${idStr}" (${fileName})`);
+                if (idStr && idStr.trim() !== '') {
                   noteId = idStr.trim();
+                  console.log(`✅ Not ID bulundu: "${noteId}" (${fileName})`);
                 }
               } else if (line.includes('Klasör ID')) {
                 const folderStr = line.match(/\*.*?:\s*(.+?)\*/)?.[1];
@@ -1763,10 +2272,13 @@ ipcMain.on('load-notes-from-files', (event) => {
           }
         }
         
+        const renderedText = renderMarkdownMain(text);
+        
+        
         loadedNotes.push({
           id: noteId,
           title: title,
-          text: renderMarkdownMain(text), // Markdown'ı HTML'e dönüştür
+          text: renderedText, // Markdown'ı HTML'e dönüştür
           createdAt: createdAt,
           updatedAt: updatedAt,
           folderId: folderId, // Klasör bilgisini ekle

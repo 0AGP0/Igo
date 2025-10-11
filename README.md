@@ -7,10 +7,13 @@ Modern ve şık masaüstü not widget'ı. Electron ile geliştirilmiş, güçlü
 ### 🎯 Ana Özellikler
 - **Floating Orb**: Masaüstünde her zaman erişilebilir orb
 - **Instant Notes**: Hızlı not oluşturma ve düzenleme
-- **Multi-Selection**: Çoklu not seçimi ve toplu işlemler
-- **Folder System**: Notları klasörlerle organize etme
+- **Todo Sistemi**: Gelişmiş görev yönetimi ve takibi
+- **Canvas Görünümü**: Notları ve todo'ları canvas'ta düzenleme
+- **Bilgi Haritası**: Notlar arası bağlantıları görselleştirme
+- **Multi-Selection**: Çoklu not/todo seçimi ve toplu işlemler
+- **Folder System**: Notları ve todo'ları klasörlerle organize etme
 - **Real-time Search**: Anlık arama ve filtreleme
-- **Markdown Support**: Zengin metin formatting
+- **Markdown Support**: Zengin metin formatting (H1-H6, listeler)
 - **System Tray**: Simge durumuna küçültme
 
 ### 🎨 Tasarım
@@ -24,15 +27,19 @@ Modern ve şık masaüstü not widget'ı. Electron ile geliştirilmiş, güçlü
 - **Resize Cards**: Kartları istediğiniz boyutta ayarlayın
 - **Context Menus**: Sağ tık menüleri ile hızlı erişim
 - **Auto-save**: Otomatik kaydetme sistemi
+- **Connection System**: Not-not, not-todo, klasör-not bağlantıları
+- **Visual Connections**: Bağlantı çizgileri ile görsel ilişkiler
+- **Connection Modal**: Gelişmiş bağlantı yönetimi
+- **Etiket Sistemi**: Notları etiketlerle kategorize etme
 
 ## 🚀 Kurulum
 
-1. **Setup Dosyası**: `Igo Desktop Widget Setup 1.0.0.exe` dosyasını çalıştırın
+1. **Setup Dosyası**: `Igo Setup 1.0.1.exe` dosyasını çalıştırın
 2. **Kurulum**: Kurulum sihirbazını takip edin
 3. **Başlatın**: Masaüstü kısayolundan veya başlat menüsünden çalıştırın
 
 ### Portable Versiyon
-Kurulum gerektirmeyen portable versiyonu da mevcuttur: `Igo Desktop Widget Portable 1.0.0.exe`
+Kurulum gerektirmeyen portable versiyonu da mevcuttur: `Igo Portable 1.0.1.exe`
 
 ## 📖 Kullanım
 
@@ -41,28 +48,54 @@ Kurulum gerektirmeyen portable versiyonu da mevcuttur: `Igo Desktop Widget Porta
 - **Sürükle**: Orb'u masaüstünde taşı
 - **Sağ Tık**: Context menü (Widget aç/kapat, Gizle, Çıkış)
 
+### Widget Kontrolü
+- **Tab Sistemi**: Sol panelde 4 farklı görünüm
+  - 📝 **Not Yönetimi**: Notları ve klasörleri yönetin
+  - ✅ **Todo Listesi**: Görevleri organize edin
+  - 🏷️ **Etiketler**: Etiketlerle filtreleme yapın
+  - 🗺️ **Bilgi Haritası**: Bağlantıları görselleştirin
+
 ### Not Yönetimi
-- **Yeni Not**: Widget açık iken "+" butonuna tıklayın
-- **Düzenle**: Nota çift tıklayın
+- **Yeni Not**: "📝 Yeni Not" butonuna tıklayın
+- **Düzenle**: Nota çift tıklayın veya sağ tık → Düzenle
 - **Sil**: Sağ tık → Sil
 - **Taşı**: Notu sürükleyip bırakın
+- **Canvas Görünümü**: Bilgi Haritası sekmesinde canvas'ta düzenleyin
+
+### Todo Sistemi
+- **Yeni Todo**: "✅ Yeni Todo" butonuna tıklayın
+- **Başlık Sistemi**: Todo içinde başlıklar ve alt görevler
+- **Öncelik Seviyeleri**: Yüksek, Orta, Düşük öncelik
+- **Filtreleme**: Öncelik ve arama ile filtreleme
+- **Canvas Görünümü**: Todo'ları canvas'ta düzenleyin
+
+### Bağlantı Sistemi
+- **Bağlantı Yönetimi**: Sağ tık → "🔗 Bağlantıları Yönet"
+- **Bağlantı Türleri**: Not-Not, Not-Todo, Klasör-Not, Todo-Klasör
+- **Görsel Çizgiler**: Canvas'ta bağlantı çizgileri
+- **Modal Arayüz**: Arama ve filtreleme ile kolay yönetim
 
 ### Multi-Selection
 1. Boş alanda sol tık + sürükle
-2. Seçili notları birlikte taşıyın
+2. Seçili notları/todo'ları birlikte taşıyın
 3. ESC ile seçimi temizleyin
 
 ### Klasör Sistemi
-- **Yeni Klasör**: "Yeni Klasör" butonuna tıklayın
+- **Yeni Klasör**: "📁 Yeni Klasör" butonuna tıklayın
 - **Notları Taşı**: Notları klasörlere sürükleyin
+- **Todo'ları Taşı**: Todo'ları klasörlere bağlayın
 - **Renk Değiştir**: Klasör rengine tıklayın
+- **Klasörde Not Oluştur**: Klasöre sağ tık → "📝 Not Ekle"
 
 ## ⌨️ Kısayollar
 
 - **ESC**: Seçimleri temizle / Modal'ları kapat
 - **Ctrl+F**: Arama kutusuna odaklan
-- **Enter**: Not düzenlemede kaydet
+- **Enter**: Not/Todo düzenlemede kaydet
 - **Sağ Tık**: Context menü
+- **Çift Tık**: Not/Todo düzenleme
+- **Sürükle**: Kartları taşıma
+- **Sürükle + Seçim**: Multi-selection
 
 ## 🔧 Sistem Gereksinimleri
 
@@ -75,8 +108,10 @@ Kurulum gerektirmeyen portable versiyonu da mevcuttur: `Igo Desktop Widget Porta
 
 - **Veri**: `%APPDATA%/igo-desktop-widget/`
 - **Ayarlar**: `settings.json`
-- **Notlar**: `notes.json`
+- **Notlar**: `notes/` klasörü (Markdown/TXT dosyaları)
+- **Todo'lar**: `todos.json`
 - **Klasörler**: `folders.json`
+- **Bağlantılar**: Notların metadata'sında saklanır
 
 ## 🆘 Sorun Giderme
 
@@ -91,9 +126,15 @@ Kurulum gerektirmeyen portable versiyonu da mevcuttur: `Igo Desktop Widget Porta
 3. Ayarları sıfırlayın
 
 ### Performans Sorunları
-1. Çok fazla not varsa klasörlere ayırın
+1. Çok fazla not/todo varsa klasörlere ayırın
 2. Zoom seviyesini düşürün
-3. Uygulamayı yeniden başlatın
+3. Bağlantı çizgilerini gizleyin (Bilgi Haritası)
+4. Uygulamayı yeniden başlatın
+
+### Bağlantı Sorunları
+1. Canvas'ta bağlantı çizgileri görünmüyorsa "Bilgi Haritası" sekmesine geçin
+2. Todo bağlantıları için todo'ların canvas'ta olması gerekir
+3. Bağlantı modal'ında arama kullanın
 
 ## 🔄 Güncellemeler
 
@@ -102,6 +143,8 @@ Gelecek güncellemeler:
 - Tema seçenekleri
 - Plugin sistemi
 - Mobile app entegrasyonu
+- Daha fazla bağlantı türü
+- Export/Import özelliği
 
 ## 📄 Lisans
 
@@ -113,5 +156,5 @@ Sorularınız için GitHub Issues kullanın veya igo@example.com'a yazın.
 
 ---
 
-**Igo Desktop Widget v1.0.0** - Modern not alma deneyimi için tasarlandı. 🚀
+**Igo Desktop Widget v1.0.1** - Modern not alma ve görev yönetimi deneyimi için tasarlandı. 🚀
 

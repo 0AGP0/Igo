@@ -257,6 +257,31 @@
         
         .orb {
             animation: solid-float 8s ease-in-out infinite;
+            /* Flicker'ı önlemek için GPU acceleration */
+            will-change: transform;
+            backface-visibility: hidden;
+        }
+        
+        /* Widget drag ediyorsa orb hover animasyonlarını devre dışı bırak */
+        .orb.widget-drag-active {
+            animation: none !important;
+            transform: none !important;
+            transition: none !important;
+        }
+        
+        .orb.widget-drag-active:hover {
+            transform: none !important;
+            background: 
+                linear-gradient(135deg, 
+                    #1a2332 0%,
+                    #0f1419 50%,
+                    #1e2a3a 100%) !important;
+            border-color: #2a3441 !important;
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.6),
+                0 2px 8px rgba(0, 0, 0, 0.4),
+                0 1px 0 rgba(255, 255, 255, 0.05) inset,
+                0 -1px 0 rgba(0, 0, 0, 0.8) inset !important;
         }
         
     </style>
@@ -276,8 +301,16 @@
         let dragTimer = null;
         let startX, startY;
         let totalMovement = 0;
+        let widgetIsOpen = false;
+        let widgetIsDragging = false;
         
         orb.addEventListener('mousedown', (e) => {
+            // Widget drag ediyorsa orb'ın drag'ını devre dışı bırak
+            if (widgetIsDragging) {
+                console.log('Widget drag aktif - orb drag devre dışı');
+                return;
+            }
+            
             if (e.button === 0) {
                 e.preventDefault();
                 startX = e.screenX;
@@ -359,28 +392,39 @@
         }
         
         orb.addEventListener('mouseup', (e) => {
+            // Widget drag ediyorsa orb'ın tıklamalarını devre dışı bırak
+            if (widgetIsDragging) {
+                console.log('Widget drag aktif - orb tıklama devre dışı');
+                return;
+            }
+            
             if (e.button === 0) {
                 const wasDragging = isDragging;
                 const hadMovement = totalMovement > 5;
                 const wasQuickClick = cleanupDrag();
                 
                 if (wasQuickClick && !wasDragging && !hadMovement) {
-                    console.log('Widget toggle - gerçek hızlı tık');
+                    console.log('🖱️ Widget toggle - gerçek hızlı tık (orb.html)');
+                    console.log(`📊 Widget durumu: ${widgetIsOpen ? 'açık' : 'kapalı'} (orb.html)`);
+                    
+                    // Direkt toggle et - main.js'de doğru toggle mantığı var
                     ipcRenderer.send('toggle-widget');
                 } else {
-                    console.log(`Drag/hareket tamamlandı - widget açılmıyor (dragging: ${wasDragging}, movement: ${totalMovement}px)`);
+                    console.log(`🚫 Drag/hareket tamamlandı - widget açılmıyor (dragging: ${wasDragging}, movement: ${totalMovement}px) (orb.html)`);
                 }
             }
         });
         
         orb.addEventListener('mouseenter', () => {
-            // Mouse orb'a girince ignore'u kapat
-            ipcRenderer.send('orb-mouse-enter');
+            // Widget drag etmiyorsa mouse event'lerini aktif et
+            if (!widgetIsDragging) {
+                ipcRenderer.send('orb-mouse-enter');
+            }
         });
         
         orb.addEventListener('mouseleave', () => {
             // Drag modundayken ignore kontrolü yapma
-            if (!isDragging) {
+            if (!isDragging && !widgetIsDragging) {
                 // Mouse orb'dan çıkınca ignore'u aç
                 ipcRenderer.send('orb-mouse-leave');
             }
@@ -392,6 +436,30 @@
         });
         
         console.log('Solid orb hazır - Built-in context menu sistemi');
+        
+        // Widget durumu mesajlarını dinle
+        ipcRenderer.on('widget-opened', () => {
+            widgetIsOpen = true;
+            console.log('🔵 Widget açıldı - durum güncellendi (orb.html)');
+        });
+        
+        ipcRenderer.on('widget-closed', () => {
+            widgetIsOpen = false;
+            console.log('🔴 Widget kapandı - durum güncellendi (orb.html)');
+        });
+        
+        // Widget drag durumu mesajlarını dinle
+        ipcRenderer.on('widget-drag-started', () => {
+            widgetIsDragging = true;
+            orb.classList.add('widget-drag-active');
+            console.log('🔄 Widget drag başladı - orb hover animasyonları devre dışı (orb.html)');
+        });
+        
+        ipcRenderer.on('widget-drag-stopped', () => {
+            widgetIsDragging = false;
+            orb.classList.remove('widget-drag-active');
+            console.log('✅ Widget drag bitti - orb hover animasyonları aktif (orb.html)');
+        });
         
         // Sağ tık menüsü - Electron built-in sistemi kullan
         orb.addEventListener('contextmenu', (e) => {

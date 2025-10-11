@@ -19,13 +19,15 @@
         <div class="search">
           <input type="text" id="q" placeholder="Ara (başlık, içerik, #etiket, [[link]])">
         </div>
-      </div>
-      <div class="toolbar">
-        <button class="btn" id="toggleSidebarBtn" title="Paneli Gizle">☰</button>
-        <button class="btn" id="newBtn">＋ Yeni</button>
-        <button class="btn" id="importBtn" title="Dosya İçe Aktar">📁 İçe Aktar</button>
-        <button class="btn" id="helpBtn" title="Yardım ve Kısayollar">❓ Yardım</button>
-        <button class="btn" id="closeBtn">✕</button>
+        <div class="toolbar">
+          <button class="btn" id="toggleSidebarBtn" title="Paneli Gizle">☰</button>
+          <button class="btn" id="newBtn" title="Yeni Not">＋</button>
+          <button class="btn" id="importBtn" title="İçe Aktar">📁</button>
+          <button class="btn" id="fullscreenBtn" title="Tam Ekran">⛶</button>
+          <button class="btn" id="settingsBtn" title="Ayarlar">⚙️</button>
+          <button class="btn" id="helpBtn" title="Yardım">❓</button>
+          <button class="btn" id="closeBtn" title="Kapat">✕</button>
+        </div>
       </div>
     </div>
     
@@ -246,6 +248,21 @@
           <div class="help-section">
             <h3>🎯 Temel İşlemler</h3>
             <div class="help-item">
+              <strong>Tab Sistemi:</strong> Sol panelde 4 farklı görünüm
+            </div>
+            <div class="help-item">
+              <strong>📝 Not Yönetimi:</strong> Notları ve klasörleri yönetin
+            </div>
+            <div class="help-item">
+              <strong>✅ Todo Listesi:</strong> Görevleri organize edin
+            </div>
+            <div class="help-item">
+              <strong>🏷️ Etiketler:</strong> Etiketlerle filtreleme yapın
+            </div>
+            <div class="help-item">
+              <strong>🗺️ Bilgi Haritası:</strong> Bağlantıları görselleştirin
+            </div>
+            <div class="help-item">
               <strong>Yeni Not:</strong> <kbd>Ctrl</kbd> + <kbd>N</kbd> veya <kbd>+</kbd> butonu
             </div>
             <div class="help-item">
@@ -325,6 +342,12 @@
             <div class="help-item">
               <strong>Todo Bağlantısı:</strong> Todo'lar notlarla otomatik bağlantı kurabilir
             </div>
+            <div class="help-item">
+              <strong>Etiket Sistemi:</strong> Etiketler sekmesinde filtreleme
+            </div>
+            <div class="help-item">
+              <strong>Etiket Autocomplete:</strong> # yazarken etiket önerileri
+            </div>
           </div>
           
           <div class="help-section">
@@ -336,7 +359,19 @@
               <strong>Todo Düzenle:</strong> Todo'ya çift tık veya sağ tık → "Düzenle"
             </div>
             <div class="help-item">
-              <strong>Subtask Ekle:</strong> Todo düzenleme panelinde "Alt Görev Ekle"
+              <strong>Başlık Sistemi:</strong> Todo içinde başlıklar oluşturup alt görevler ekleyin
+            </div>
+            <div class="help-item">
+              <strong>Başlık Ekle:</strong> Todo düzenleme panelinde "📝 Başlık" butonu
+            </div>
+            <div class="help-item">
+              <strong>Alt Görev Ekle:</strong> Başlık altında "+" butonuna tıklayın
+            </div>
+            <div class="help-item">
+              <strong>Öncelik Seviyeleri:</strong> Yüksek (!), Orta (•), Düşük (-)
+            </div>
+            <div class="help-item">
+              <strong>Todo Filtreleme:</strong> Öncelik ve arama ile filtreleme
             </div>
             <div class="help-item">
               <strong>Todo Taşı:</strong> Todo kartını sürükle
@@ -375,7 +410,38 @@
           </div>
           
           <div class="help-section">
+            <h3>🔗 Bağlantı Sistemi</h3>
+            <div class="help-item">
+              <strong>Bağlantı Yönetimi:</strong> Sağ tık → "🔗 Bağlantıları Yönet"
+            </div>
+            <div class="help-item">
+              <strong>Bağlantı Türleri:</strong> Not-Not, Not-Todo, Klasör-Not, Todo-Klasör
+            </div>
+            <div class="help-item">
+              <strong>Görsel Çizgiler:</strong> Canvas'ta renkli bağlantı çizgileri
+            </div>
+            <div class="help-item">
+              <strong>Modal Arayüz:</strong> Arama ve filtreleme ile kolay yönetim
+            </div>
+            <div class="help-item">
+              <strong>Not-Not:</strong> Wikilink sistemi ile [[Not Adı]]
+            </div>
+            <div class="help-item">
+              <strong>Not-Todo:</strong> Bağlantı modal'ında not-todo bağlantısı
+            </div>
+            <div class="help-item">
+              <strong>Klasör Bağlantıları:</strong> Notları ve todo'ları klasörlere bağlama
+            </div>
+            <div class="help-item">
+              <strong>Bağlantı Renkleri:</strong> Her bağlantı türü farklı renkte çizgiler
+            </div>
+          </div>
+          
+          <div class="help-section">
             <h3>🗺️ Harita Modu (Bilgi Haritası)</h3>
+            <div class="help-item">
+              <strong>Canvas Görünümü:</strong> Notları ve todo'ları canvas'ta düzenleyin
+            </div>
             <div class="help-item">
               <strong>Zoom In:</strong> <kbd>Ctrl</kbd> + <kbd>+</kbd> veya <kbd>Ctrl</kbd> + Mouse Wheel Up
             </div>
@@ -392,7 +458,10 @@
               <strong>Tüm Notları Gör:</strong> Zoom reset butonu
             </div>
             <div class="help-item">
-              <strong>Bağlantı Çizgileri:</strong> Otomatik olarak [[link]] formatında çizilir
+              <strong>Bağlantı Çizgileri:</strong> Otomatik olarak tüm bağlantılar çizilir
+            </div>
+            <div class="help-item">
+              <strong>Todo Canvas:</strong> Todo'ları canvas'ta düzenleyin
             </div>
           </div>
           
@@ -482,6 +551,21 @@
               <strong>Todo Bağlantıları:</strong> Todo'lar notlarla bağlantı kurabilir
             </div>
             <div class="help-item">
+              <strong>Bağlantı Modal:</strong> Gelişmiş bağlantı yönetimi arayüzü
+            </div>
+            <div class="help-item">
+              <strong>Canvas Görünümü:</strong> Notları ve todo'ları canvas'ta düzenleme
+            </div>
+            <div class="help-item">
+              <strong>Bilgi Haritası:</strong> Bağlantıları görselleştirme
+            </div>
+            <div class="help-item">
+              <strong>Tab Sistemi:</strong> 4 farklı görünüm modu
+            </div>
+            <div class="help-item">
+              <strong>Todo Başlık Sistemi:</strong> Todo içinde başlıklar ve alt görevler
+            </div>
+            <div class="help-item">
               <strong>Zoom Popup:</strong> Düşük zoom seviyelerinde kart isimleri popup olarak görünür
             </div>
             <div class="help-item">
@@ -498,10 +582,86 @@
         </div>
       </div>
     </div>
+    
+    <!-- Basit Ayarlar Modal -->
+    <div class="modal-overlay" id="settingsModal" onclick="closeSettingsModal()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-title">⚙️ Ayarlar</div>
+        
+        <div class="modal-content">
+          <div class="setting-item">
+            <label class="setting-label">
+              <input type="checkbox" id="alwaysOnTopCheckbox" onchange="toggleAlwaysOnTop()">
+              <span class="setting-text">Her zaman üstte kal</span>
+            </label>
+            <div class="setting-description">Widget'ın diğer pencerelerin üstünde kalmasını sağlar</div>
+          </div>
+        </div>
+        
+        <div class="modal-buttons">
+          <button class="modal-btn primary" onclick="closeSettingsModal()">Tamam</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-<script src="src/scripts/maintwo.js"></script>
+<!-- Core Modules -->
+<script src="src/scripts/core/constants.js"></script>
+<script src="src/scripts/core/dom.js"></script>
+<script src="src/scripts/core/storage.js"></script>
+<script src="src/scripts/core/state.js"></script>
+<script src="src/scripts/core/settings.js"></script>
+
+<!-- Utils Modules (helpers önce yüklenmeli - dataLoader'da kullanılıyor) -->
+<script src="src/scripts/utils/helpers.js"></script>
+<script src="src/scripts/utils/markdown.js"></script>
+<script src="src/scripts/utils/fileOperations.js"></script>
+<script src="src/scripts/utils/noteUtils.js"></script>
+
+<!-- Core Data Loader (helpers'dan sonra yüklenmeli) -->
+<script src="src/scripts/core/dataLoader.js"></script>
+
+<!-- Manager Modules -->
+<script src="src/scripts/managers/selectionManager.js"></script>
+<script src="src/scripts/managers/noteManager.js"></script>
+<script src="src/scripts/managers/folderManager.js"></script>
+<script src="src/scripts/managers/folderOperations.js"></script>
+<script src="src/scripts/managers/tagManager.js"></script>
+<script src="src/scripts/managers/todoIntegration.js"></script>
+
+<!-- UI Modules -->
+<script src="src/scripts/ui/notifications.js"></script>
+<script src="src/scripts/ui/titlePopup.js"></script>
+<script src="src/scripts/ui/contextMenu.js"></script>
+<script src="src/scripts/ui/modals.js"></script>
+<script src="src/scripts/ui/connectionModal.js"></script>
+<script src="src/scripts/ui/widget.js"></script>
+<script src="src/scripts/ui/sidebar.js"></script>
+<script src="src/scripts/ui/minimap.js"></script>
+
+<!-- Canvas Modules -->
+<script src="src/scripts/canvas/zoom.js"></script>
+<script src="src/scripts/canvas/boardOperations.js"></script>
+<script src="src/scripts/canvas/folderRender.js"></script>
+<script src="src/scripts/canvas/resize.js"></script>
+<script src="src/scripts/canvas/dragDrop.js"></script>
+<script src="src/scripts/canvas/noteRender.js"></script>
+<script src="src/scripts/canvas/connections.js"></script>
+
+<!-- Editor Modules -->
+<script src="src/scripts/editor/preview.js"></script>
+<script src="src/scripts/editor/notePanel.js"></script>
+
+<!-- Event Modules -->
+<script src="src/scripts/events/domEvents.js"></script>
+
+<!-- Main Scripts -->
 <script src="src/scripts/todo.js"></script>
+
+<!-- Systems (son yüklenmeli - event listeners) -->
+<script src="src/scripts/core/electron.js"></script>
+<script src="src/scripts/core/saveSystem.js"></script>
+<script src="src/scripts/core/keyboard.js"></script>
 <script>
 // Widget için basit fonksiyonlar
 function createNote() {
