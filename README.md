@@ -136,25 +136,4 @@ Kurulum gerektirmeyen portable versiyonu da mevcuttur: `Igo Portable 1.0.1.exe`
 2. Todo bağlantıları için todo'ların canvas'ta olması gerekir
 3. Bağlantı modal'ında arama kullanın
 
-## 🔄 Güncellemeler
-
-Gelecek güncellemeler:
-- Cloud sync desteği
-- Tema seçenekleri
-- Plugin sistemi
-- Mobile app entegrasyonu
-- Daha fazla bağlantı türü
-- Export/Import özelliği
-
-## 📄 Lisans
-
-MIT License - Özgürce kullanabilir, değiştirebilir ve dağıtabilirsiniz.
-
-## 👥 Destek
-
-Sorularınız için GitHub Issues kullanın veya igo@example.com'a yazın.
-
----
-
-**Igo Desktop Widget v1.0.1** - Modern not alma ve görev yönetimi deneyimi için tasarlandı. 🚀
 
