@@ -1,8 +1,8 @@
 {
-  "alwaysOnTop": false,
+  "alwaysOnTop": true,
   "widget_rect": {
-    "x": 444,
-    "y": 158,
+    "x": 660,
+    "y": 182,
     "width": 1000,
     "height": 700
   }

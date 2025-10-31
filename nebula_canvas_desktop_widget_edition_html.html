@@ -5,8 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Igo — Desktop Widget Edition</title>
 <link rel="stylesheet" href="src/styles/main.css">
-<link rel="stylesheet" href="src/styles/todo.css">
-<script src="https://cdn.ckeditor.com/ckeditor5/40.1.0/classic/ckeditor.js"></script>
+<link rel="stylesheet" href="src/styles/noteditor.css">
+<!-- Vditor CSS -->
+<link rel="stylesheet" href="https://unpkg.com/vditor/dist/index.css">
+<!-- Vditor JS -->
+<script src="https://unpkg.com/vditor/dist/index.min.js"></script>
 <style>
 
 </style>
@@ -37,7 +40,6 @@
         <!-- Tab Headers -->
         <div class="tabs">
           <div class="tab active" data-tab="notes">Not Yönetimi</div>
-          <div class="tab" data-tab="todos">Todo Listesi</div>
           <div class="tab" data-tab="tags">Etiketler</div>
           <div class="tab" data-tab="map">Bilgi Haritası</div>
         </div>
@@ -53,30 +55,6 @@
           </div>
         </div>
         
-        <!-- Tab Content: Todo Listesi -->
-        <div class="tab-content" id="tab-todos">
-          <div class="todo-controls">
-            <button class="folder-btn" id="newTodoBtn">+ Yeni Todo</button>
-          </div>
-          
-          <div class="todo-search">
-            <input type="text" id="todoSearchInput" placeholder="Todo ara...">
-            <button class="clear-search" id="clearTodoSearch">×</button>
-          </div>
-          
-          <div class="todo-filters">
-            <div class="todo-filter active" data-filter="all">Tümü</div>
-            <div class="todo-filter" data-filter="high">Yüksek Öncelik</div>
-            <div class="todo-filter" data-filter="medium">Orta Öncelik</div>
-            <div class="todo-filter" data-filter="low">Düşük Öncelik</div>
-          </div>
-          
-          <div id="todoStats"></div>
-          
-          <div class="todo-list" id="todoList">
-            <!-- Todo kartları buraya gelecek -->
-          </div>
-        </div>
         
         <!-- Tab Content: Etiketler -->
         <div class="tab-content" id="tab-tags">
@@ -184,7 +162,7 @@
       </div>
     </div>
     
-    <!-- CKEditor Note Panel -->
+    <!-- Vditor Note Panel -->
     <div class="note-panel-overlay" id="notePanelOverlay">
       <div class="note-panel-container">
         <div class="note-panel-header">
@@ -239,6 +217,17 @@
       </div>
     </div>
     
+    <!-- Alert Modal -->
+    <div class="modal-overlay" id="alertModal" onclick="closeAlertModal()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-title" id="alertModalTitle">Bilgi</div>
+        <div class="modal-content" id="alertModalMessage" style="padding: 20px; text-align: center;"></div>
+        <div class="modal-buttons">
+          <button class="modal-btn primary" onclick="closeAlertModal()">Tamam</button>
+        </div>
+      </div>
+    </div>
+    
     <!-- Yardım Modal -->
     <div class="modal-overlay" id="helpModal" onclick="closeHelpModal()">
       <div class="modal help-modal" onclick="event.stopPropagation()">
@@ -286,7 +275,7 @@
           </div>
           
           <div class="help-section">
-            <h3>📝 Not Düzenleme (CKEditor)</h3>
+            <h3>📝 Not Düzenleme (Vditor)</h3>
             <div class="help-item">
               <strong>Kalın:</strong> <kbd>Ctrl</kbd> + <kbd>B</kbd>
             </div>
@@ -614,6 +603,7 @@
 
 <!-- Utils Modules (helpers önce yüklenmeli - dataLoader'da kullanılıyor) -->
 <script src="src/scripts/utils/helpers.js"></script>
+<script src="src/scripts/utils/folderMatch.js"></script>
 <script src="src/scripts/utils/markdown.js"></script>
 <script src="src/scripts/utils/fileOperations.js"></script>
 <script src="src/scripts/utils/noteUtils.js"></script>
@@ -627,13 +617,13 @@
 <script src="src/scripts/managers/folderManager.js"></script>
 <script src="src/scripts/managers/folderOperations.js"></script>
 <script src="src/scripts/managers/tagManager.js"></script>
-<script src="src/scripts/managers/todoIntegration.js"></script>
 
 <!-- UI Modules -->
 <script src="src/scripts/ui/notifications.js"></script>
 <script src="src/scripts/ui/titlePopup.js"></script>
 <script src="src/scripts/ui/contextMenu.js"></script>
 <script src="src/scripts/ui/modals.js"></script>
+<script src="src/scripts/ui/tutorial.js"></script>
 <script src="src/scripts/ui/connectionModal.js"></script>
 <script src="src/scripts/ui/widget.js"></script>
 <script src="src/scripts/ui/sidebar.js"></script>
@@ -656,7 +646,6 @@
 <script src="src/scripts/events/domEvents.js"></script>
 
 <!-- Main Scripts -->
-<script src="src/scripts/todo.js"></script>
 
 <!-- Systems (son yüklenmeli - event listeners) -->
 <script src="src/scripts/core/electron.js"></script>
@@ -664,23 +653,43 @@
 <script src="src/scripts/core/keyboard.js"></script>
 <script>
 // Widget için basit fonksiyonlar
-function createNote() {
+// Widget için createNote fonksiyonu (sonsuz döngüyü önlemek için farklı isim)
+function createNoteWidget() {
   // Ana uygulamadaki createNote fonksiyonunu çağır
-  if (typeof window.createNoteMain === 'function') {
-    window.createNoteMain();
-  } else {
-    console.log('createNote fonksiyonu bulunamadı');
+  try {
+    if (typeof window.createNote === 'function') {
+      window.createNote();
+    } else {
+      console.log('createNote fonksiyonu bulunamadı');
+    }
+  } catch (error) {
+    console.error('createNote çağrısında hata:', error);
   }
 }
 
-function createFolder() {
+// Global createNoteMain fonksiyonu (context menu için)
+window.createNoteMain = function() {
+  createNoteWidget();
+};
+
+// Widget için createFolder fonksiyonu (sonsuz döngüyü önlemek için farklı isim)
+function createFolderWidget() {
   // Ana uygulamadaki createFolder fonksiyonunu çağır
-  if (typeof window.createFolderMain === 'function') {
-    window.createFolderMain();
-  } else {
-    console.log('createFolder fonksiyonu bulunamadı');
+  try {
+    if (typeof window.createFolder === 'function') {
+      window.createFolder();
+    } else {
+      console.log('createFolder fonksiyonu bulunamadı');
+    }
+  } catch (error) {
+    console.error('createFolder çağrısında hata:', error);
   }
 }
+
+// Global createFolderMain fonksiyonu (context menu için)
+window.createFolderMain = function() {
+  createFolderWidget();
+};
 </script>
 </body>
 </html>

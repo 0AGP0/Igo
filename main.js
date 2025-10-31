@@ -1,5 +1,17 @@
 console.log('🚀 [MAIN] main.js başlatıldı!');
 console.log('🚀 [MAIN] Electron modülleri yüklendi!');
+
+// Global error handler
+process.on('uncaughtException', (error) => {
+  console.error('❌ [UNCAUGHT EXCEPTION]:', error);
+  console.error('❌ Stack trace:', error.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ [UNHANDLED REJECTION]:', reason);
+  console.error('❌ Promise:', promise);
+});
+
 const { app, BrowserWindow, ipcMain, screen, Tray, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -16,7 +28,7 @@ function getAppDir() {
 }
 
 // Sistem klasörleri - bu klasörler UI'da gösterilmez
-const SYSTEM_FOLDERS = ['todos', '.git', '.vscode', 'node_modules'];
+const SYSTEM_FOLDERS = ['todos', '.git', '.vscode', 'node_modules', '.media'];
 
 // Markdown render fonksiyonu (main.js için)
 function renderMarkdownMain(text) {
@@ -52,7 +64,7 @@ function renderMarkdownMain(text) {
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
   
   // 3. Diğer markdown elementleri
-  // Başlıklar - multiline desteği ile (CKEditor stilleri ile)
+  // Başlıklar - multiline desteği ile (Vditor stilleri ile)
   html = html.replace(/^# (.+)$/gm, '<h1 style="font-size: 1.8em; font-weight: 700; color: #7dd3fc; margin: 16px 0 8px 0; line-height: 1.3;">$1</h1>');
   html = html.replace(/^## (.+)$/gm, '<h2 style="font-size: 1.5em; font-weight: 700; color: #7dd3fc; margin: 14px 0 6px 0; line-height: 1.3;">$1</h2>');
   html = html.replace(/^### (.+)$/gm, '<h3 style="font-size: 1.3em; font-weight: 600; color: #e9eef5; margin: 12px 0 6px 0; line-height: 1.3;">$1</h3>');
@@ -1170,8 +1182,10 @@ ipcMain.handle('get-folder-structure', () => {
         if (stat.isDirectory()) {
           // Sistem klasörlerini hariç tut
           if (!SYSTEM_FOLDERS.includes(item)) {
-            // Klasör ID'sini oluştur - klasör ismi bazlı (notlarla eşleşmesi için)
-            const folderId = item.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
+            // Klasör ID'sini oluştur - path bazlı (aynı isimde alt klasör ve ana klasör çakışmasını önle)
+            // Relative path kullanarak benzersiz ID oluştur
+            const pathForId = itemRelativePath ? itemRelativePath.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_') : item.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
+            const folderId = pathForId || item.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
             
             const folder = {
               id: folderId,
@@ -1430,7 +1444,7 @@ ipcMain.on('delete-folder', (event, folderData) => {
 });
 
 // Notu klasöre taşıma - Geliştirilmiş versiyon
-ipcMain.on('move-note-to-folder', (event, data) => {
+ipcMain.handle('move-note-to-folder', async (event, data) => {
   const fs = require('fs');
   const appDir = getAppDir();
   const notesDir = path.join(appDir, 'notes');
@@ -1527,8 +1541,7 @@ ipcMain.on('move-note-to-folder', (event, data) => {
         // Dosya zaten hedef klasördeyse işlem yapma
         if (path.dirname(oldPath) === folderPath) {
           console.log('📁 Not zaten hedef klasörde:', fileName);
-          event.reply('note-moved', { success: true });
-          return;
+          return { success: true };
         }
         
         fs.renameSync(oldPath, newPath);
@@ -1571,11 +1584,11 @@ ipcMain.on('move-note-to-folder', (event, data) => {
         const newRelativePath = path.relative(notesDir, newPath);
         
         console.log('📁 Not klasöre taşındı:', fileName, '→', folderName);
-        event.reply('note-moved', { 
+        return { 
           success: true, 
           newRelativePath: newRelativePath,
           newFileName: fileName
-        });
+        };
       } else {
         // Klasörsüz yap - ana notes klasörüne taşı
         const newPath = path.join(notesDir, fileName);
@@ -1629,18 +1642,18 @@ ipcMain.on('move-note-to-folder', (event, data) => {
         const newRelativePath = path.relative(notesDir, newPath);
         
         console.log('📁 Not klasörsüz yapıldı:', fileName);
-        event.reply('note-moved', { 
+        return { 
           success: true, 
           newRelativePath: newRelativePath,
           newFileName: fileName
-        });
+        };
       }
     } else {
-      event.reply('note-moved', { success: false, error: 'Not dosyası bulunamadı' });
+      return { success: false, error: 'Not dosyası bulunamadı' };
     }
   } catch (error) {
     console.error('❌ Not taşınamadı:', error);
-    event.reply('note-moved', { success: false, error: error.message });
+    return { success: false, error: error.message };
   }
 });
 
@@ -1697,7 +1710,7 @@ function cleanHtmlToText(html) {
   let text = html
     .replace(/<blockquote[^>]*>/gi, '> ')  // <blockquote> açılış etiketini "> " çevir
     .replace(/<\/blockquote>/gi, '\n\n')   // </blockquote> kapanış etiketini çift satır sonuna çevir
-    .replace(/<hr[^>]*class="custom-hr"[^>]*>/gi, '\n---\n')  // CKEditor hr etiketlerini "---" çizgisine çevir
+    .replace(/<hr[^>]*class="custom-hr"[^>]*>/gi, '\n---\n')  // Vditor hr etiketlerini "---" çizgisine çevir
     .replace(/<hr[^>]*>/gi, '\n---\n')     // Diğer <hr> etiketlerini "---" çizgisine çevir
     .replace(/<br\s*\/?>/gi, '\n')         // <br> etiketlerini satır sonuna çevir
     .replace(/<p[^>]*>/gi, '')             // <p> açılış etiketlerini kaldır
@@ -1729,193 +1742,626 @@ function cleanHtmlToText(html) {
 }
 
 ipcMain.on('save-note-to-file', (event, data) => {
-  const fs = require('fs');
-  const appDir = getAppDir();
-  const notesDir = path.join(appDir, 'notes');
-  
-  // Notes klasörünü oluştur
-  if (!fs.existsSync(notesDir)) {
-    fs.mkdirSync(notesDir, { recursive: true });
-    console.log('📁 Notes klasörü oluşturuldu:', notesDir);
+  // Data kontrolü
+  if (!data || typeof data !== 'object') {
+    console.error('❌ save-note-to-file: Geçersiz data parametresi:', data);
+    event.reply('note-saved-to-file', { success: false, error: 'Geçersiz data parametresi' });
+    return;
   }
   
-  const { note, fileName, oldFileName } = data;
+  try {
+    const fs = require('fs');
+    const appDir = getAppDir();
+    const notesDir = path.join(appDir, 'notes');
   
-  // Relative path varsa kullan, yoksa direkt notes klasörüne kaydet
-  let newFilePath;
-  if (note.relativePath) {
-    // Relative path kullan (örn: "Ma/s.txt")
-    newFilePath = path.join(notesDir, note.relativePath);
-    
-    // Klasör yapısını oluştur
-    const dirPath = path.dirname(newFilePath);
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
-      console.log('📁 Klasör oluşturuldu:', dirPath);
+    // Notes klasörünü oluştur
+    if (!fs.existsSync(notesDir)) {
+      fs.mkdirSync(notesDir, { recursive: true });
+      console.log('📁 Notes klasörü oluşturuldu:', notesDir);
     }
-  } else {
-    // Yeni dosya için direkt notes klasörüne kaydet
-    newFilePath = path.join(notesDir, fileName);
-  }
-  
-  // Markdown içeriği varsa kullan, yoksa HTML'i temizle
-  let contentToSave;
-  if (note.markdownContent) {
-    contentToSave = note.markdownContent;
-    console.log('📝 Markdown içeriği kullanılıyor');
-  } else {
-    contentToSave = cleanHtmlToText(note.text);
-    console.log('📝 HTML içeriği temizleniyor');
-  }
-  
-  // Dosya içeriğini oluştur (uzantıya göre)
-  let fileContent = '';
-  if (fileName.endsWith('.txt')) {
-    // .txt dosyaları için içerik + metadata (HTML comment formatı)
-    fileContent = `${contentToSave}
+    
+    const { note, fileName, oldFileName } = data;
+    
+    // Dosya yolunu belirle
+    let newFilePath;
+    let oldFilePath = null;
+    
+    // Önce eski dosyanın yolunu bul (eğer varsa)
+    if (oldFileName) {
+      if (note.relativePath) {
+        // Eski relativePath'i kullan
+        oldFilePath = path.join(notesDir, note.relativePath);
+      } else if (note.filePath) {
+        // Eski filePath'i kullan
+        oldFilePath = note.filePath;
+      } else {
+        // Sadece dosya adı varsa notes dizininde ara
+        oldFilePath = path.join(notesDir, oldFileName);
+      }
+    }
+    
+    // Yeni dosya yolunu belirle
+    if (note.folderId) {
+      // Klasör içindeyse, klasör yolunu kullan
+      // Path bazlı ID kullan - klasör yapısından klasör adını bul
+      let folderPath = null;
+      
+      // Klasör yapısını recursive olarak ara
+      function findFolderPath(dirPath, targetId, currentPath = '') {
+        if (!fs.existsSync(dirPath)) return null;
+        
+        const items = fs.readdirSync(dirPath);
+        for (const item of items) {
+          const itemPath = path.join(dirPath, item);
+          const stat = fs.statSync(itemPath);
+          
+          if (stat.isDirectory() && !SYSTEM_FOLDERS.includes(item)) {
+            // Klasör ID'sini oluştur (get-folder-structure ile aynı mantık)
+            const itemRelativePath = currentPath ? path.join(currentPath, item).replace(/\\/g, '/') : item;
+            const pathForId = itemRelativePath.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
+            const folderId = pathForId || item.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
+            
+            // Eşleşme kontrolü - path bazlı ID
+            if (folderId === targetId || folderId === targetId.replace(/[^a-zA-Z0-9_]/g, '_')) {
+              return itemPath; // Klasör adını path olarak döndür
+            }
+            
+            // Eski format uyumluluk: Klasör adı ile direkt eşleşme
+            // Eğer targetId klasör adı ise (eski notlar için)
+            const normalizedTargetId = (targetId || '').toLowerCase().replace(/[^a-z0-9_ğüşiöçı]/g, '_');
+            const normalizedTargetIdASCII = (targetId || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            const normalizedItemName = item.toLowerCase().replace(/[^a-z0-9_ğüşiöçı]/g, '_');
+            const normalizedItemNameASCII = item.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            
+            // Direkt klasör adı eşleşmesi (eski format: "sonra", "ncelikli" vb.)
+            if (targetId === item || targetId === item.toLowerCase()) {
+              return itemPath;
+            }
+            
+            // Normalize edilmiş eşleşme
+            if (normalizedTargetId === normalizedItemName || normalizedTargetIdASCII === normalizedItemNameASCII) {
+              return itemPath;
+            }
+            
+            // Türkçe karakter kaybı durumu: "ncelikli" → "öncelikli"
+            const itemLettersOnlyASCII = item.toLowerCase().replace(/[^a-z]/g, '');
+            const targetIdLettersOnlyASCII = (targetId || '').toLowerCase().replace(/[^a-z]/g, '');
+            if (targetIdLettersOnlyASCII && itemLettersOnlyASCII) {
+              // Başta 1 karakter kaybı durumu
+              if (itemLettersOnlyASCII.length === targetIdLettersOnlyASCII.length + 1 && 
+                  itemLettersOnlyASCII.endsWith(targetIdLettersOnlyASCII)) {
+                return itemPath;
+              }
+            }
+            
+            // Alt klasörleri ara
+            const found = findFolderPath(itemPath, targetId, itemRelativePath);
+            if (found) return found;
+          }
+        }
+        return null;
+      }
+      
+      folderPath = findFolderPath(notesDir, note.folderId);
+      
+      // Klasör bulunamadıysa, eski format için ek kontroller yap
+      if (!folderPath) {
+        // ID'den klasör adını çıkarmaya çalış (son kısımdan)
+        const parts = note.folderId.split('_');
+        if (parts.length > 0) {
+          // Son parçayı klasör adı olarak dene
+          const possibleFolderName = parts[parts.length - 1];
+          const possiblePath = path.join(notesDir, possibleFolderName);
+          if (fs.existsSync(possiblePath)) {
+            folderPath = possiblePath;
+          }
+        }
+        
+        // Hala bulunamadıysa, tüm klasörleri tarayarak eşleşme ara (eski format)
+        if (!folderPath && fs.existsSync(notesDir)) {
+          const allItems = fs.readdirSync(notesDir);
+          for (const item of allItems) {
+            const itemPath = path.join(notesDir, item);
+            const itemStat = fs.statSync(itemPath);
+            if (itemStat.isDirectory() && !SYSTEM_FOLDERS.includes(item)) {
+              // Klasör adı ile direkt eşleşme (eski format)
+              const normalizedTargetId = (note.folderId || '').toLowerCase().replace(/[^a-z0-9_ğüşiöçı]/g, '_');
+              const normalizedItemName = item.toLowerCase().replace(/[^a-z0-9_ğüşiöçı]/g, '_');
+              const normalizedTargetIdASCII = (note.folderId || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+              const normalizedItemNameASCII = item.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+              
+              if (note.folderId === item || 
+                  note.folderId === item.toLowerCase() ||
+                  normalizedTargetId === normalizedItemName ||
+                  normalizedTargetIdASCII === normalizedItemNameASCII) {
+                folderPath = itemPath;
+                break;
+              }
+              
+              // Türkçe karakter kaybı durumu
+              const itemLettersOnlyASCII = item.toLowerCase().replace(/[^a-z]/g, '');
+              const targetIdLettersOnlyASCII = (note.folderId || '').toLowerCase().replace(/[^a-z]/g, '');
+              if (targetIdLettersOnlyASCII && itemLettersOnlyASCII) {
+                if (itemLettersOnlyASCII.length === targetIdLettersOnlyASCII.length + 1 && 
+                    itemLettersOnlyASCII.endsWith(targetIdLettersOnlyASCII)) {
+                  folderPath = itemPath;
+                  break;
+                }
+              }
+            }
+          }
+        }
+        
+        // Hala bulunamadıysa - YENİ KLASÖR OLUŞTURMA YOK
+        // Notu ana klasöre kaydet veya hata ver
+        if (!folderPath) {
+          console.log(`⚠️ UYARI: Klasör ID'ye göre klasör bulunamadı: "${note.folderId}". Not ana klasöre kaydediliyor.`);
+          console.log(`⚠️ Mevcut klasörler:`, fs.readdirSync(notesDir).filter(item => {
+            const itemPath = path.join(notesDir, item);
+            return fs.statSync(itemPath).isDirectory() && !SYSTEM_FOLDERS.includes(item);
+          }));
+          // Klasör bulunamadı, notu ana klasöre kaydet ve folderId'yi null yap
+          folderPath = null; // Ana klasör
+          // Not: folderPath null ise, aşağıdaki else bloğu çalışacak ve ana klasöre kaydedecek
+        }
+      }
+      
+      // Klasör bulundu, dosyayı kaydet
+      // Klasörü oluşturma - SADECE GERÇEKTEN VARSA VE YOKSA
+      if (folderPath && !fs.existsSync(folderPath)) {
+        // Klasör bulundu ama yoksa - bu durum olmamalı ama yine de kontrol et
+        console.log(`⚠️ UYARI: Klasör path'i bulundu ama klasör yok: ${folderPath}`);
+        // Yeni klasör oluşturma - BU ÇOK TEHLİKELİ! Sadece gerçekten gerekliyse
+        // Şimdilik dosyayı ana klasöre kaydet
+        console.log(`⚠️ Klasör oluşturma atlandı, not ana klasöre kaydediliyor.`);
+        folderPath = null; // Ana klasöre kaydet
+      }
+      
+      // Klasör bulunduysa oraya, yoksa ana klasöre kaydet
+      if (folderPath) {
+        newFilePath = path.join(folderPath, fileName);
+      } else {
+        // Klasör bulunamadı, notu ana klasöre kaydet ve folderId'yi null yap
+        newFilePath = path.join(notesDir, fileName);
+        // Not: Bu durumda notun folderId'si de null olmalı
+        // Ama bu renderer tarafında yapılmalı, burada sadece dosyayı kaydediyoruz
+      }
+    } else if (note.relativePath) {
+      // Relative path varsa ve klasör değilse, relativePath'i güncelle
+      // Eğer dosya adı değiştiyse, relativePath'teki dosya adını güncelle
+      const dirPath = path.dirname(path.join(notesDir, note.relativePath));
+      newFilePath = path.join(dirPath, fileName);
+    } else {
+      // Yeni dosya için direkt notes klasörüne kaydet
+      newFilePath = path.join(notesDir, fileName);
+    }
+    
+    // Eski dosyayı sil (eğer varsa ve yeni dosyadan farklıysa)
+    if (oldFilePath && oldFilePath !== newFilePath && fs.existsSync(oldFilePath)) {
+      try {
+        fs.unlinkSync(oldFilePath);
+        console.log('🗑️ Eski dosya silindi:', oldFilePath);
+      } catch (error) {
+        console.error('⚠️ Eski dosya silinemedi:', error);
+      }
+    }
+    
+    // Markdown içeriği varsa kullan, yoksa HTML'i temizle
+    let contentToSave;
+    if (note.markdownContent) {
+      contentToSave = note.markdownContent;
+      console.log('📝 Markdown içeriği kullanılıyor');
+    } else {
+      contentToSave = cleanHtmlToText(note.text);
+      console.log('📝 HTML içeriği temizleniyor');
+    }
+    
+    // Dosya içeriğini oluştur (uzantıya göre)
+    let fileContent = '';
+    if (fileName.endsWith('.txt')) {
+      // .txt dosyaları için içerik + metadata (HTML comment formatı)
+      fileContent = `${contentToSave}
 
 <!-- METADATA_START -->
 <!-- Oluşturulma: ${new Date(note.createdAt).toLocaleString('tr-TR')} -->
 <!-- Son güncelleme: ${new Date(note.updatedAt).toLocaleString('tr-TR')} -->
 <!-- Not ID: ${note.id} -->
-<!-- Klasör ID: ${note.folderId ? note.folderId.toLowerCase().replace(/[^a-zA-Z0-9]/g, '') : 'null'} -->
+<!-- Klasör ID: ${note.folderId ? note.folderId : 'null'} -->
 <!-- METADATA_END -->`;
-  } else {
-    // .md dosyaları için markdown format
-    // Mevcut dosya varsa metadata'yı koru ve güncelle
-    let existingMetadata = '';
-    let createdAtStr = new Date(note.createdAt).toLocaleString('tr-TR');
-    
-    // note.filePath yoksa relativePath'ten oluştur
-    let actualFilePath = note.filePath;
-    if (!actualFilePath && note.relativePath) {
-      actualFilePath = path.join(notesDir, note.relativePath);
-    }
-    
-    if (actualFilePath && fs.existsSync(actualFilePath)) {
-      try {
-        const existingContent = fs.readFileSync(actualFilePath, 'utf8');
-        // Mevcut metadata'yı bul
-        const metadataMatch = existingContent.match(/---\n\*Oluşturulma: (.+?)\*\n\*Son güncelleme:.*?\*\n\*Not ID:.*?\*\n\*Klasör ID:.*?\*\n(?:---)?$/s);
-        if (metadataMatch) {
-          // Oluşturulma tarihini koru
-          createdAtStr = metadataMatch[1];
-          console.log('✅ Mevcut metadata bulundu, oluşturulma tarihi korunuyor:', createdAtStr);
-        }
-      } catch (e) {
-        console.log('⚠️ Mevcut dosya okunamadı, yeni metadata oluşturulacak');
+    } else {
+      // .md dosyaları için markdown format
+      // Mevcut dosya varsa metadata'yı koru ve güncelle
+      let existingMetadata = '';
+      let createdAtStr = new Date(note.createdAt).toLocaleString('tr-TR');
+      
+      // note.filePath yoksa relativePath'ten oluştur
+      let actualFilePath = note.filePath;
+      if (!actualFilePath && note.relativePath) {
+        actualFilePath = path.join(notesDir, note.relativePath);
       }
-    }
-    
-    // İçerikte zaten başlık varsa tekrar ekleme
-    const hasTitle = contentToSave.trim().startsWith('# ');
-    const titleLine = hasTitle ? '' : `# ${note.title}\n\n`;
-    const finalContent = hasTitle ? contentToSave : contentToSave;
-    
-    fileContent = `${titleLine}${finalContent}
+      
+      if (actualFilePath && fs.existsSync(actualFilePath)) {
+        try {
+          const existingContent = fs.readFileSync(actualFilePath, 'utf8');
+          // Mevcut metadata'yı bul
+          const metadataMatch = existingContent.match(/---\n\*Oluşturulma: (.+?)\*\n\*Son güncelleme:.*?\*\n\*Not ID:.*?\*\n\*Klasör ID:.*?\*\n(?:---)?$/s);
+          if (metadataMatch) {
+            // Oluşturulma tarihini koru
+            createdAtStr = metadataMatch[1];
+            console.log('✅ Mevcut metadata bulundu, oluşturulma tarihi korunuyor:', createdAtStr);
+          }
+        } catch (e) {
+          console.log('⚠️ Mevcut dosya okunamadı, yeni metadata oluşturulacak');
+        }
+      }
+      
+      // İçerikte zaten başlık varsa tekrar ekleme
+      const hasTitle = contentToSave.trim().startsWith('# ');
+      const titleLine = hasTitle ? '' : `# ${note.title}\n\n`;
+      const finalContent = hasTitle ? contentToSave : contentToSave;
+      
+      fileContent = `${titleLine}${finalContent}
 
 ---
 *Oluşturulma: ${createdAtStr}*
 *Son güncelleme: ${new Date(note.updatedAt).toLocaleString('tr-TR')}*
 *Not ID: ${note.id}*
-*Klasör ID: ${note.folderId ? note.folderId.toLowerCase().replace(/[^a-zA-Z0-9]/g, '') : 'null'}*
+*Klasör ID: ${note.folderId ? note.folderId : 'null'}*
 `;
-  }
+    }
 
-  // Eğer relative path varsa, direkt o dosyayı güncelle (yeniden adlandırma yapma)
-  if (note.relativePath) {
-    // Dosya adı değiştiyse yeniden adlandır
-    if (oldFileName && oldFileName !== fileName) {
-      const oldFilePath = path.join(notesDir, note.relativePath);
-      const newFilePath = path.join(path.dirname(oldFilePath), fileName);
+    // Dosyayı kaydet
+    fs.writeFileSync(newFilePath, fileContent, 'utf8');
+    console.log('💾 Dosya kaydedildi:', newFilePath);
+    
+    // Yeni relative path'i hesapla
+    const newRelativePath = path.relative(notesDir, newFilePath);
+    const normalizedRelativePath = newRelativePath.replace(/\\/g, '/');
+    
+    // Başarılı yanıt gönder
+    event.reply('note-saved-to-file', { 
+      success: true, 
+      filePath: newFilePath,
+      newRelativePath: normalizedRelativePath,
+      newFileName: fileName
+    });
+  } catch (error) {
+    console.error('❌ Not dosyaya kaydedilemedi:', error);
+    event.reply('note-saved-to-file', { success: false, error: error.message });
+  }
+});
+
+// App dizinini al (renderer'dan) - Async handler
+ipcMain.handle('get-app-dir', async (event) => {
+  try {
+    const appDir = getAppDir();
+    return { success: true, appDir: appDir };
+  } catch (error) {
+    console.error('❌ get-app-dir hatası:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// App dizinini al (renderer'dan) - Sync handler (kart render için)
+ipcMain.on('get-app-dir-sync', (event) => {
+  try {
+    const appDir = getAppDir();
+    event.returnValue = { success: true, appDir: appDir };
+  } catch (error) {
+    console.error('❌ get-app-dir-sync hatası:', error);
+    event.returnValue = { success: false, error: error.message };
+  }
+});
+
+// Yüklenen dosyaları (resim/ses) kaydet
+ipcMain.handle('save-uploaded-file', async (event, data) => {
+  try {
+    // Data kontrolü
+    if (!data || typeof data !== 'object') {
+      console.error('❌ save-uploaded-file: Geçersiz data parametresi:', data);
+      return { success: false, error: 'Geçersiz data parametresi' };
+    }
+    
+    const fs = require('fs');
+    const appDir = getAppDir();
+    const notesDir = path.join(appDir, 'notes');
+    
+    // Notes klasörünü oluştur
+    if (!fs.existsSync(notesDir)) {
+      fs.mkdirSync(notesDir, { recursive: true });
+      console.log('📁 Notes klasörü oluşturuldu:', notesDir);
+    }
+    
+    const { noteId, fileName, fileData, fileType, isImage, isAudio } = data;
+    
+    // Not ID'si kontrolü
+    if (!noteId) {
+      console.error('❌ Not ID yok');
+      return { success: false, error: 'Not ID gerekli' };
+    }
+    
+    // Notun dosyasını bul (recursive arama)
+    function findNoteFile(dirPath, targetNoteId) {
+      const items = fs.readdirSync(dirPath);
+      
+      for (const item of items) {
+        const itemPath = path.join(dirPath, item);
+        const stat = fs.statSync(itemPath);
+        
+        if (stat.isDirectory()) {
+          // Sistem klasörlerini hariç tut
+          const SYSTEM_FOLDERS = ['.git', 'node_modules', '.vscode'];
+          if (!SYSTEM_FOLDERS.includes(item)) {
+            // Alt klasörü recursive olarak tara
+            const result = findNoteFile(itemPath, targetNoteId);
+            if (result) return result;
+          }
+        } else if (stat.isFile() && (item.endsWith('.md') || item.endsWith('.txt'))) {
+          // Dosyayı kontrol et
+          try {
+            const content = fs.readFileSync(itemPath, 'utf8');
+            
+            // Hem MD hem TXT formatlarını kontrol et
+            const mdFormat = content.includes(`*Not ID: ${targetNoteId}*`);
+            const txtFormatOld = content.includes(`// Not ID: ${targetNoteId}`);
+            const txtFormatNew = content.includes(`<!-- Not ID: ${targetNoteId} -->`);
+            
+            if (mdFormat || txtFormatOld || txtFormatNew) {
+              return { 
+                filePath: itemPath, 
+                fileName: item, 
+                dirPath: path.dirname(itemPath),
+                relativePath: path.relative(notesDir, itemPath) 
+              };
+            }
+          } catch (readError) {
+            console.log('⚠️ Dosya okunamadı:', itemPath);
+          }
+        }
+      }
+      return null;
+    }
+    
+    // Media dosyaları için gizli klasör (.media)
+    const mediaDir = path.join(notesDir, '.media');
+    
+    // .media klasörünü oluştur (yoksa)
+    if (!fs.existsSync(mediaDir)) {
+      fs.mkdirSync(mediaDir, { recursive: true });
+      console.log('📁 Media klasörü oluşturuldu:', mediaDir);
+    }
+    
+    // Dosya adını güvenli hale getir ve timestamp ekle (duplikasyon önlemek için)
+    const timestamp = Date.now();
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileExtension = path.extname(safeFileName);
+    const fileNameWithoutExt = path.basename(safeFileName, fileExtension);
+    const uniqueFileName = `${fileNameWithoutExt}_${timestamp}${fileExtension}`;
+    
+    // Media klasörüne kaydet
+    const filePath = path.join(mediaDir, uniqueFileName);
+    const targetDir = mediaDir;
+    
+    // Buffer'ı dosyaya yaz
+    fs.writeFileSync(filePath, fileData, { encoding: 'binary' });
+    
+    console.log('✅ Yüklenen dosya kaydedildi:', filePath);
+    
+    // Relative path'i hesapla (notes klasörüne göre) - .media klasörü ile
+    relativePath = path.relative(notesDir, filePath).replace(/\\/g, '/');
+    
+    // .media klasörünü gizli yap (Windows'ta hidden attribute)
+    try {
+      const { exec } = require('child_process');
+      if (process.platform === 'win32') {
+        // Windows'ta hidden attribute ekle
+        exec(`attrib +H "${mediaDir}"`, (error) => {
+          if (!error) {
+            console.log('✅ .media klasörü gizli olarak işaretlendi');
+          }
+        });
+      }
+    } catch (err) {
+      // Ignore - gizli yapma hatası kritik değil
+    }
+    
+    return {
+      success: true,
+      filePath: filePath,
+      relativePath: relativePath,
+      fileName: uniqueFileName
+    };
+  } catch (error) {
+    console.error('❌ save-uploaded-file hatası:', error);
+    return {
+      success: false,
+      error: error.message || 'Bilinmeyen hata'
+    };
+  }
+});
+
+// Media dosyasını sil
+ipcMain.handle('delete-media-file', async (event, data) => {
+  try {
+    if (!data || !data.filePath) {
+      return { success: false, error: 'File path gerekli' };
+    }
+    
+    const fs = require('fs');
+    const path = require('path');
+    const appDir = getAppDir();
+    const notesDir = path.join(appDir, 'notes');
+    const mediaDir = path.join(notesDir, '.media');
+    
+    // Path'i normalize et
+    let filePath = data.filePath;
+    
+    // Relative path ise absolute path'e çevir
+    if (!path.isAbsolute(filePath)) {
+      if (filePath.startsWith('.media/')) {
+        filePath = path.join(notesDir, filePath);
+      } else if (filePath.includes('.media')) {
+        filePath = path.join(notesDir, filePath);
+      } else {
+        // Sadece dosya adı verilmişse .media klasöründe ara
+        filePath = path.join(mediaDir, path.basename(filePath));
+      }
+    }
+    
+    // Sadece .media klasöründeki dosyaları sil (güvenlik)
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const normalizedMediaDir = mediaDir.replace(/\\/g, '/');
+    if (!normalizedPath.includes(normalizedMediaDir)) {
+      return { success: false, error: 'Sadece .media klasöründeki dosyalar silinebilir' };
+    }
+    
+    // Dosya var mı kontrol et
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log('✅ Media dosyası silindi:', filePath);
+      return { success: true, filePath: filePath };
+    } else {
+      console.log('⚠️ Dosya bulunamadı (zaten silinmiş olabilir):', filePath);
+      return { success: true, filePath: filePath, message: 'Dosya bulunamadı (zaten silinmiş)' };
+    }
+  } catch (error) {
+    console.error('❌ delete-media-file hatası:', error);
+    return { success: false, error: error.message || 'Bilinmeyen hata' };
+  }
+});
+
+// Relative path'ten full path'i al
+ipcMain.handle('get-file-path', async (event, data) => {
+  try {
+    const { relativePath } = data;
+    if (!relativePath) {
+      return { success: false, error: 'Relative path gerekli' };
+    }
+    
+    const appDir = getAppDir();
+    const notesDir = path.join(appDir, 'notes');
+    const fullPath = path.join(notesDir, relativePath);
+    
+    return {
+      success: true,
+      fullPath: fullPath
+    };
+  } catch (error) {
+    console.error('❌ get-file-path hatası:', error);
+    return {
+      success: false,
+      error: error.message || 'Bilinmeyen hata'
+    };
+  }
+});
+
+// Not dosya adını yeniden adlandır
+ipcMain.on('rename-note-file', (event, data) => {
+  try {
+    // Data kontrolü
+    if (!data || typeof data !== 'object') {
+      console.error('❌ Geçersiz data parametresi:', data);
+      event.reply('note-file-renamed', { success: false, error: 'Geçersiz data parametresi' });
+      return;
+    }
+    
+    const fs = require('fs');
+    const appDir = getAppDir();
+    const notesDir = path.join(appDir, 'notes');
+    
+    const { noteId, oldFileName, newFileName, note } = data;
+    
+    // Gerekli alanları kontrol et
+    if (!oldFileName || !newFileName) {
+      console.error('❌ Eksik dosya adı parametreleri:', { oldFileName, newFileName });
+      event.reply('note-file-renamed', { success: false, error: 'Eksik dosya adı parametreleri' });
+      return;
+    }
+    
+    // Eski dosya yolu
+    const oldFilePath = path.join(notesDir, oldFileName);
+    
+    // Yeni dosya yolu
+    const newFilePath = path.join(notesDir, newFileName);
+    
+    console.log('📝 Dosya yeniden adlandırma denemesi:', oldFileName, '→', newFileName);
+    console.log('📁 Eski dosya yolu:', oldFilePath);
+    console.log('📁 Yeni dosya yolu:', newFilePath);
+    console.log('📁 Eski dosya var mı?', fs.existsSync(oldFilePath));
+    console.log('📁 Yeni dosya var mı?', fs.existsSync(newFilePath));
+    
+    // Eski dosya var mı kontrol et
+    if (fs.existsSync(oldFilePath)) {
+      // Yeni dosya zaten var mı kontrol et
+      if (fs.existsSync(newFilePath)) {
+        console.log('⚠️ Yeni dosya zaten mevcut, işlem atlanıyor');
+        try {
+          event.reply('note-file-renamed', { 
+            success: true, 
+            oldFileName: oldFileName,
+            newFileName: newFileName,
+            noteId: noteId,
+            message: 'Dosya zaten mevcut'
+          });
+        } catch (replyError) {
+          console.error('❌ Reply gönderme hatası:', replyError);
+        }
+        return;
+      }
       
       // Dosyayı yeniden adlandır
       fs.renameSync(oldFilePath, newFilePath);
-      console.log('📝 Dosya yeniden adlandırıldı:', oldFileName, '→', fileName);
+      console.log('📝 Dosya yeniden adlandırıldı:', oldFileName, '→', newFileName);
       
-      // Yeni relative path'i hesapla
-      const newRelativePath = path.relative(notesDir, newFilePath);
-      
-      // Dosya içeriğini güncelle
-      fs.writeFile(newFilePath, fileContent, 'utf8', (err) => {
-        if (err) {
-          console.error('❌ Not dosyaya kaydedilemedi:', err);
-          event.reply('note-saved-to-file', { success: false, error: err.message });
-        } else {
-          console.log('💾 Dosya yeniden adlandırıldı ve güncellendi:', fileName);
-          event.reply('note-saved-to-file', { 
-            success: true, 
-            filePath: newFilePath,
-            newRelativePath: newRelativePath,
-            newFileName: fileName
-          });
-        }
-      });
-      return; // Fonksiyondan çık
+      // Başarı mesajı gönder
+      try {
+        event.reply('note-file-renamed', { 
+          success: true, 
+          oldFileName: oldFileName,
+          newFileName: newFileName,
+          noteId: noteId 
+        });
+      } catch (replyError) {
+        console.error('❌ Reply gönderme hatası:', replyError);
+      }
+    } else if (fs.existsSync(newFilePath)) {
+      // Eski dosya yok ama yeni dosya var - zaten yeniden adlandırılmış
+      console.log('✅ Dosya zaten yeniden adlandırılmış:', newFileName);
+      try {
+        event.reply('note-file-renamed', { 
+          success: true, 
+          oldFileName: oldFileName,
+          newFileName: newFileName,
+          noteId: noteId,
+          message: 'Dosya zaten yeniden adlandırılmış'
+        });
+      } catch (replyError) {
+        console.error('❌ Reply gönderme hatası:', replyError);
+      }
     } else {
-      // Dosya adı aynıysa sadece içeriği güncelle
-      const filePath = path.join(notesDir, note.relativePath);
-      fs.writeFile(filePath, fileContent, 'utf8', (err) => {
-        if (err) {
-          console.error('❌ Not dosyaya kaydedilemedi:', err);
-          event.reply('note-saved-to-file', { success: false, error: err.message });
-        } else {
-          console.log('💾 Mevcut dosya güncellendi:', filePath);
-          event.reply('note-saved-to-file', { success: true, filePath: filePath });
-        }
-      });
-      return; // Fonksiyondan çık
+      console.error('❌ Ne eski ne de yeni dosya bulunamadı:', oldFilePath, newFilePath);
+      try {
+        event.reply('note-file-renamed', { 
+          success: false, 
+          error: 'Dosya bulunamadı',
+          oldFileName: oldFileName 
+        });
+      } catch (replyError) {
+        console.error('❌ Reply gönderme hatası:', replyError);
+      }
     }
-  }
-  
-  // Relative path yoksa eski mantık (yeniden adlandırma vs.)
-  let oldFilePath;
-  if (oldFileName) {
-    oldFilePath = path.join(notesDir, oldFileName);
-  }
-  
-  const shouldRename = oldFileName && oldFileName !== fileName && oldFilePath && fs.existsSync(oldFilePath);
-  
-  if (shouldRename) {
-    
-    // Async rename kullan
-    fs.rename(oldFilePath, newFilePath, (err) => {
-      if (err) {
-        console.error('❌ Dosya yeniden adlandırılamadı:', err);
-        // Hata durumunda yeni dosya oluştur
-        fs.writeFile(newFilePath, fileContent, 'utf8', (writeErr) => {
-          if (writeErr) {
-            console.error('❌ Not dosyaya kaydedilemedi:', writeErr);
-            event.reply('note-saved-to-file', { success: false, error: writeErr.message });
-          } else {
-            console.log('💾 Not dosyaya kaydedildi:', fileName);
-            event.reply('note-saved-to-file', { success: true, filePath: newFilePath });
-          }
-        });
-      } else {
-        // Rename başarılı, içeriği güncelle
-        fs.writeFile(newFilePath, fileContent, 'utf8', (writeErr) => {
-          if (writeErr) {
-            console.error('❌ Not içeriği güncellenemedi:', writeErr);
-            event.reply('note-saved-to-file', { success: false, error: writeErr.message });
-          } else {
-            console.log('📝 Dosya yeniden adlandırıldı ve güncellendi:', oldFileName, '→', fileName);
-            event.reply('note-saved-to-file', { success: true, filePath: newFilePath });
-          }
+  } catch (error) {
+    console.error('❌ Dosya yeniden adlandırma hatası:', error);
+    try {
+      if (event && !event.sender.isDestroyed()) {
+        event.reply('note-file-renamed', { 
+          success: false, 
+          error: error.message || 'Bilinmeyen hata'
         });
       }
-    });
-  } else {
-    // Yeni dosya oluştur veya mevcut dosyayı güncelle
-    fs.writeFile(newFilePath, fileContent, 'utf8', (err) => {
-      if (err) {
-        console.error('❌ Not dosyaya kaydedilemedi:', err);
-        event.reply('note-saved-to-file', { success: false, error: err.message });
-      } else {
-        console.log('💾 Not dosyaya kaydedildi:', fileName);
-        event.reply('note-saved-to-file', { success: true, filePath: newFilePath });
-      }
-    });
+    } catch (replyError) {
+      console.error('❌ Reply gönderme hatası:', replyError);
+    }
   }
 });
 
@@ -2018,8 +2464,9 @@ ipcMain.on('load-notes-from-files', (event) => {
             scanDirectory(itemPath, itemRelativePath);
           }
         } else if (stat.isFile() && (item.endsWith('.md') || item.endsWith('.txt'))) {
-          // Dosyayı işle
-          processNoteFile(itemPath, itemRelativePath, item);
+          // Dosyayı işle - relativePath'i normalize et
+          const normalizedRelativePath = itemRelativePath.replace(/\\/g, '/');
+          processNoteFile(itemPath, normalizedRelativePath, item);
         }
       });
     }
@@ -2152,18 +2599,71 @@ ipcMain.on('load-notes-from-files', (event) => {
                 const dateStr = line.match(/\*.*?:\s*(.+?)\*/)?.[1];
                 if (dateStr) {
                   try {
-                    createdAt = new Date(dateStr).toISOString();
+                    // Türkçe tarih formatını parse et (dd.mm.yyyy hh:mm:ss)
+                    // Örnek: "31.10.2025 22:02:55"
+                    let parsedDate;
+                    if (dateStr.includes('.')) {
+                      // Türkçe format: dd.mm.yyyy hh:mm:ss
+                      const dateParts = dateStr.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+                      if (dateParts) {
+                        const [, day, month, year, hour, minute, second] = dateParts;
+                        parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute), parseInt(second));
+                      } else {
+                        // Sadece tarih varsa: dd.mm.yyyy
+                        const dateOnlyParts = dateStr.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+                        if (dateOnlyParts) {
+                          const [, day, month, year] = dateOnlyParts;
+                          parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                        } else {
+                          parsedDate = new Date(dateStr);
+                        }
+                      }
+                    } else {
+                      parsedDate = new Date(dateStr);
+                    }
+                    
+                    if (parsedDate && !isNaN(parsedDate.getTime())) {
+                      createdAt = parsedDate.toISOString();
+                    } else {
+                      console.log(`⚠️ Tarih parse edilemedi: ${dateStr}`);
+                    }
                   } catch (e) {
-                    console.log(`⚠️ Tarih parse edilemedi: ${dateStr}`);
+                    console.log(`⚠️ Tarih parse hatası: ${dateStr}`, e);
                   }
                 }
               } else if (line.includes('güncelleme') || line.includes('gÃ¼ncelleme')) {
                 const dateStr = line.match(/\*.*?:\s*(.+?)\*/)?.[1];
                 if (dateStr) {
                   try {
-                    updatedAt = new Date(dateStr).toISOString();
+                    // Türkçe tarih formatını parse et (dd.mm.yyyy hh:mm:ss)
+                    let parsedDate;
+                    if (dateStr.includes('.')) {
+                      // Türkçe format: dd.mm.yyyy hh:mm:ss
+                      const dateParts = dateStr.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+                      if (dateParts) {
+                        const [, day, month, year, hour, minute, second] = dateParts;
+                        parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute), parseInt(second));
+                      } else {
+                        // Sadece tarih varsa: dd.mm.yyyy
+                        const dateOnlyParts = dateStr.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+                        if (dateOnlyParts) {
+                          const [, day, month, year] = dateOnlyParts;
+                          parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                        } else {
+                          parsedDate = new Date(dateStr);
+                        }
+                      }
+                    } else {
+                      parsedDate = new Date(dateStr);
+                    }
+                    
+                    if (parsedDate && !isNaN(parsedDate.getTime())) {
+                      updatedAt = parsedDate.toISOString();
+                    } else {
+                      console.log(`⚠️ Tarih parse edilemedi: ${dateStr}`);
+                    }
                   } catch (e) {
-                    console.log(`⚠️ Tarih parse edilemedi: ${dateStr}`);
+                    console.log(`⚠️ Tarih parse hatası: ${dateStr}`, e);
                   }
                 }
               } else if (line.includes('Not ID')) {
@@ -2176,7 +2676,16 @@ ipcMain.on('load-notes-from-files', (event) => {
               } else if (line.includes('Klasör ID')) {
                 const folderStr = line.match(/\*.*?:\s*(.+?)\*/)?.[1];
                 if (folderStr && folderStr !== 'null') {
-                  folderId = folderStr.trim();
+                  const originalFolderId = folderStr.trim();
+                  console.log(`📁 Metadata'dan klasör ID okundu: "${originalFolderId}" (${fileName})`);
+                  
+                  // Eski format: Klasör adı direkt olarak yazılmış olabilir
+                  // Orijinal ID'yi sakla, normalize edilmiş versiyonunu da dene
+                  // Önce orijinal ID'yi kullan, eşleştirme sırasında normalize edilmiş versiyonu da denenecek
+                  folderId = originalFolderId;
+                  
+                  // Not: folderId eşleştirmesi render ve filter fonksiyonlarında yapılacak
+                  // Burada sadece orijinal değeri saklıyoruz
                 }
               }
             }
@@ -2202,7 +2711,7 @@ ipcMain.on('load-notes-from-files', (event) => {
         // Etiketleri parse et
         const tags = [];
         
-        // HTML içindeki etiketleri yakala (CKEditor 5'den gelen)
+        // HTML içindeki etiketleri yakala (Vditor'dan gelen)
         const htmlTagMatches = text.match(/<span class="tagtok">#([^<]+)<\/span>/g);
         if (htmlTagMatches) {
           htmlTagMatches.forEach(match => {
@@ -2236,12 +2745,22 @@ ipcMain.on('load-notes-from-files', (event) => {
           console.log(`⚠️ Not ID bulunamadı, benzersiz ID oluşturuldu: ${noteId} (${fileName})`);
         }
         
-        // Eğer dosya alt klasördeyse ve klasör ID'si yoksa, klasör adından ID oluştur
-        if (!folderId && relativePath !== fileName) {
-          const folderName = path.dirname(relativePath);
-          // Klasör adını direkt ID olarak kullan (basit ve anlaşılır)
-          folderId = folderName.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
-          console.log(`📁 Alt klasördeki not için klasör ID oluşturuldu: ${folderName} → ${folderId}`);
+        // Eğer dosya alt klasördeyse ve klasör ID'si yoksa (null ise), path bazlı ID oluştur
+        // Eski notlar için folderId null olabilir, relativePath'ten çıkar
+        if (!folderId && relativePath !== fileName && relativePath.includes('/')) {
+          // relativePath zaten normalize edilmiş geliyor (scanDirectory'de normalize ediliyor)
+          const folderPath = path.dirname(relativePath).replace(/\\/g, '/'); // Windows path'lerini normalize et
+          
+          // Klasör ID'sini path bazlı oluştur (get-folder-structure ile aynı mantık)
+          // itemRelativePath kullanarak ID oluştur (tam path)
+          folderId = folderPath.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
+          console.log(`📁 Alt klasördeki not için klasör ID oluşturuldu: ${folderPath} → ${folderId}`);
+          
+          // Eğer klasör ID'si boşsa (sadece dosya adıysa), null olarak bırak
+          if (!folderId || folderId.trim() === '') {
+            folderId = null;
+            console.log(`⚠️ Klasör ID oluşturulamadı, null olarak bırakıldı: ${relativePath}`);
+          }
         }
         
         // Eğer metadata yoksa dosyaya ekle
@@ -2278,7 +2797,9 @@ ipcMain.on('load-notes-from-files', (event) => {
         loadedNotes.push({
           id: noteId,
           title: title,
-          text: renderedText, // Markdown'ı HTML'e dönüştür
+          text: text, // Orijinal markdown içeriği
+          markdownContent: text, // Markdown içeriği ayrıca sakla
+          renderedText: renderedText, // HTML render edilmiş versiyon
           createdAt: createdAt,
           updatedAt: updatedAt,
           folderId: folderId, // Klasör bilgisini ekle
@@ -2546,12 +3067,7 @@ function scanNotesFolderOnStartup() {
       fs.mkdirSync(notesDir, { recursive: true });
     }
     
-    // Todos klasörünü oluştur
-    const todosDir = path.join(notesDir, 'todos');
-    if (!fs.existsSync(todosDir)) {
-      console.log('📋 Todos klasörü oluşturuluyor...');
-      fs.mkdirSync(todosDir, { recursive: true });
-    }
+    // Todos klasörü artık otomatik oluşturulmayacak
     
     console.log('📁 Notes klasörü taranıyor...');
     
@@ -2606,4 +3122,5 @@ function scanNotesFolderOnStartup() {
     console.error('❌ Notes klasörü taranamadı:', error);
   }
 }
+
 

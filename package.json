@@ -76,7 +76,12 @@
   ],
   "author": "Igo Team",
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/cli": "^7.4.3",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/ios": "^7.4.3"
+  },
   "devDependencies": {
     "electron": "^37.4.0",
     "electron-builder": "^24.13.3"
