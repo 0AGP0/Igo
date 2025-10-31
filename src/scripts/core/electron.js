@@ -23,6 +23,20 @@ try {
   
   console.log('⚡ Electron IPC entegrasyonu aktif');
   
+  // window.electronAPI'yi tanımla
+  window.electronAPI = {
+    invoke: (channel, data) => {
+      return new Promise((resolve, reject) => {
+        ipcRenderer.invoke(channel, data)
+          .then(result => resolve(result))
+          .catch(error => reject(error));
+      });
+    },
+    send: (channel, data) => {
+      ipcRenderer.send(channel, data);
+    }
+  };
+  
 } catch (e) {
   // Web tarayıcısında çalışıyorsa mock ipcRenderer
   ipcRenderer = {
@@ -38,6 +52,18 @@ try {
       }
     }
   };
+  
+  // Mock window.electronAPI
+  window.electronAPI = {
+    invoke: (channel, data) => {
+      console.log(`🌐 Mock IPC invoke: ${channel}`, data);
+      return Promise.resolve({ success: true, message: 'Mock mode' });
+    },
+    send: (channel, data) => {
+      console.log(`🌐 Mock IPC send: ${channel}`, data);
+    }
+  };
+  
   console.log('🌐 Browser modunda çalışıyor (mock IPC)');
 }
 

@@ -8,6 +8,7 @@ let resizeStartX = 0;
 let resizeStartY = 0;
 let resizeStartWidth = 0;
 let resizeStartHeight = 0;
+let resizeRenderTimeout = null;
 
 // Global resize event listeners (sadece bir kez eklenir)
 let resizeListenersAdded = false;
@@ -45,6 +46,22 @@ function addGlobalResizeListeners() {
     if (note) {
       note.customWidth = newWidth;
       note.customHeight = newHeight;
+      
+      // İçeriği yeniden render et (kart boyutu değiştiğinde) - Debounce ile
+      if (resizeRenderTimeout) {
+        clearTimeout(resizeRenderTimeout);
+      }
+      
+      resizeRenderTimeout = setTimeout(() => {
+        if (!currentResizingElement) return; // Element null ise çık
+        const snippetElement = currentResizingElement.querySelector('.snippet');
+        if (snippetElement && note && note.text) {
+          // Basit çözüm: Not içeriğini direkt render et (resimler dahil)
+          const renderedContent = window.renderMarkdown ? window.renderMarkdown(note.text) : note.text;
+          snippetElement.innerHTML = renderedContent;
+        }
+        resizeRenderTimeout = null;
+      }, 150); // 150ms debounce - performans için
       
       // Akıllı kaydetme - resize değişikliğinde
       if (window.scheduleSave) window.scheduleSave();

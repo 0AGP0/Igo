@@ -11,9 +11,8 @@ function createFolder() {
   openFolderModal();
 }
 
-function openFolderModal() {
+function openFolderModal(parentFolderId = null) {
   const DOM = window.DOM;
-  const FOLDER_COLORS = window.FOLDER_COLORS || [];
   
   const modal = DOM.get('folderModal');
   const nameInput = DOM.get('folderNameInput');
@@ -22,20 +21,32 @@ function openFolderModal() {
   // Modal'ı göster
   DOM.addClass(modal, 'show');
   
-  // Renk seçicisini oluştur
-  colorPicker.innerHTML = '';
-  FOLDER_COLORS.forEach((color, index) => {
-    const colorOption = document.createElement('div');
-    colorOption.className = `color-option ${index === 0 ? 'selected' : ''}`;
-    colorOption.style.background = color;
-    colorOption.onclick = () => selectColor(color, colorOption);
-    colorPicker.appendChild(colorOption);
-  });
+  // Eski renk seçiciyi kaldır, yeni RGB renk seçiciyi göster
+  colorPicker.innerHTML = `
+    <div class="folder-color-selector">
+      <div class="current-color-display" id="currentFolderColor" style="background: #3b82f6;"></div>
+      <button class="color-select-btn" onclick="openColorPickerForNewFolder()">Renk Seç</button>
+    </div>
+  `;
   
-  // İlk rengi seç
+  // State'i ayarla
   const state = window.getState();
-  state.selectedColor = FOLDER_COLORS[0];
+  state.selectedColor = '#3b82f6';
+  state.subFolderParentId = parentFolderId || null;
   window.setState(state);
+  
+  // Modal başlığını güncelle
+  const modalTitle = modal.querySelector('.modal-title');
+  if (modalTitle) {
+    if (parentFolderId) {
+      const parentFolder = window.folders.find(f => f.id === parentFolderId);
+      if (parentFolder) {
+        modalTitle.textContent = `📁 Alt Klasör Oluştur: ${parentFolder.name}`;
+      }
+    } else {
+      modalTitle.textContent = '📁 Yeni Klasör';
+    }
+  }
   
   // Input'u temizle ve aktif hale getir
   nameInput.value = '';
@@ -43,10 +54,9 @@ function openFolderModal() {
   nameInput.readOnly = false;
   nameInput.style.pointerEvents = 'auto';
   
-  // Input'a focus - daha güçlü
+  // Input'a focus
   setTimeout(() => {
     nameInput.focus();
-    nameInput.click(); // Ekstra güvence
     console.log('✅ Klasör modal açıldı ve input focus verildi');
   }, 100);
   
@@ -54,19 +64,28 @@ function openFolderModal() {
   document.addEventListener('keydown', handleModalKeydown);
 }
 
-function selectColor(color, element) {
-  const state = window.getState();
-  state.selectedColor = color;
-  window.setState(state);
+// Yeni klasör için renk seçiciyi aç
+function openColorPickerForNewFolder() {
+  const currentColorDisplay = document.getElementById('currentFolderColor');
+  const currentColor = currentColorDisplay ? currentColorDisplay.style.background || '#3b82f6' : '#3b82f6';
   
-  // Önceki seçimi temizle
-  document.querySelectorAll('.color-option').forEach(el => {
-    el.classList.remove('selected');
-  });
-  
-  // Yeni seçimi işaretle
-  element.classList.add('selected');
+  // Callback ile renk seçiciyi aç
+  if (window.showColorPickerModal) {
+    window.showColorPickerModal((selectedColor) => {
+    // Seçilen rengi state'e kaydet
+    const state = window.getState();
+    state.selectedColor = selectedColor;
+    window.setState(state);
+    
+    // Görseli güncelle
+    if (currentColorDisplay) {
+      currentColorDisplay.style.background = selectedColor;
+    }
+    }, currentColor);
+  }
 }
+
+// selectColor fonksiyonu artık gerekli değil, RGB renk seçici kullanılıyor
 
 function handleModalKeydown(e) {
   if (e.key === 'Escape') {
@@ -83,6 +102,19 @@ function closeFolderModal() {
   
   DOM.removeClass(modal, 'show');
   nameInput.value = '';
+  
+  // State'i temizle
+  if (window.setState) {
+    const state = window.getState();
+    state.subFolderParentId = null;
+    window.setState(state);
+  }
+  
+  // Modal başlığını varsayılana döndür
+  const modalTitle = modal.querySelector('.modal-title');
+  if (modalTitle) {
+    modalTitle.textContent = '📁 Yeni Klasör Oluştur';
+  }
   
   // Event listener'ı kaldır
   document.removeEventListener('keydown', handleModalKeydown);
@@ -102,18 +134,59 @@ function confirmCreateFolder() {
     return;
   }
   
-  let folder;
+  // Aynı isimde klasör kontrolü (tüm klasörler arasında)
+  const folders = window.folders || [];
   const state = window.getState();
+  const isSubFolder = state.subFolderParentId !== null && state.subFolderParentId !== undefined;
+  
+  // Aynı isimde klasör var mı kontrol et
+  const existingFolder = folders.find(f => f.name === name);
+  if (existingFolder) {
+    if (window.showNotification) {
+      window.showNotification(`"${name}" isimli bir klasör zaten mevcut!`, 'error');
+    }
+    nameInput.style.borderColor = 'var(--danger)';
+    nameInput.focus();
+    setTimeout(() => {
+      nameInput.style.borderColor = '';
+    }, 2000);
+    return;
+  }
+  
+  let folder;
   
   try {
-    folder = {
-      id: window.generateUniqueId(name, 'folder'), // Benzersiz ID
-      name: name,
-      color: state.selectedColor,
-      parentId: null, // Ana klasör
-      level: 0, // Ana klasör seviyesi
-      createdAt: new Date().toISOString()
-    };
+    if (isSubFolder) {
+      // Alt klasör oluşturma
+      const parentFolder = folders.find(f => f.id === state.subFolderParentId);
+      if (!parentFolder) {
+        if (window.showNotification) {
+          window.showNotification('Ana klasör bulunamadı!', 'error');
+        }
+        return;
+      }
+      
+      folder = {
+        id: window.generateUniqueId(name, 'folder'),
+        name: name,
+        color: state.selectedColor,
+        path: parentFolder.path ? `${parentFolder.path}/${name}` : `${parentFolder.name}/${name}`,
+        parentId: state.subFolderParentId,
+        parentPath: parentFolder.path || parentFolder.name,
+        level: (parentFolder.level || 0) + 1,
+        createdAt: new Date().toISOString()
+      };
+    } else {
+      // Ana klasör oluşturma
+      folder = {
+        id: window.generateUniqueId(name, 'folder'), // Benzersiz ID
+        name: name,
+        color: state.selectedColor,
+        parentId: null, // Ana klasör
+        level: 0, // Ana klasör seviyesi
+        createdAt: new Date().toISOString()
+      };
+    }
     
     window.folders.push(folder);
     if (window.saveFolders) window.saveFolders();
@@ -130,16 +203,40 @@ function confirmCreateFolder() {
   // Dosya sisteminde klasör oluştur
   if (typeof require !== 'undefined') {
     const { ipcRenderer } = require('electron');
-    ipcRenderer.send('create-folder', folder);
+    
+    if (isSubFolder) {
+      // Alt klasör için parentPath gönder
+      const parentFolder = folders.find(f => f.id === state.subFolderParentId);
+      ipcRenderer.send('create-folder', {
+        name: folder.name,
+        parentPath: parentFolder.path || parentFolder.name
+      });
+    } else {
+      ipcRenderer.send('create-folder', folder);
+    }
     
     ipcRenderer.once('folder-created', (event, result) => {
       if (result.success) {
         console.log('📁 Klasör dosya sisteminde oluşturuldu:', folder.name);
       } else {
         console.error('❌ Klasör dosya sisteminde oluşturulamadı:', result.error);
+        if (window.showNotification) {
+          window.showNotification('Klasör oluşturulamadı: ' + result.error, 'error');
+        }
+        // Hata durumunda klasörü geri al
+        const index = window.folders.findIndex(f => f.id === folder.id);
+        if (index !== -1) {
+          window.folders.splice(index, 1);
+          if (window.saveFolders) window.saveFolders();
+        }
+        return;
       }
     });
   }
+  
+  // State'i temizle
+  state.subFolderParentId = null;
+  window.setState(state);
   
   if (window.renderFolderList) window.renderFolderList();
   if (window.renderNotesImmediate) window.renderNotesImmediate(); // Board üzerindeki klasörleri anında güncelle
@@ -188,6 +285,18 @@ function selectFolder(folderId) {
 
 function getFolderNotes(folderId) {
   const notes = window.notes || [];
+  const folders = window.folders || [];
+  
+  // Klasörü bul
+  const folder = folders.find(f => f.id === folderId);
+  if (!folder) return [];
+  
+  // Genel eşleştirme fonksiyonu kullan
+  if (window.doesNoteMatchFolder) {
+    return notes.filter(note => window.doesNoteMatchFolder(note.folderId, folderId, folder));
+  }
+  
+  // Fallback: eski mantık
   return notes.filter(note => note.folderId === folderId);
 }
 
@@ -228,7 +337,7 @@ function centerOnFolder(folderId) {
 // Global exports
 window.createFolder = createFolder;
 window.openFolderModal = openFolderModal;
-window.selectColor = selectColor;
+window.openColorPickerForNewFolder = openColorPickerForNewFolder;
 window.handleModalKeydown = handleModalKeydown;
 window.closeFolderModal = closeFolderModal;
 window.confirmCreateFolder = confirmCreateFolder;
@@ -272,6 +381,7 @@ function calculateFolderWidth(folder, isSubFolder) {
   return Math.min(Math.max(minWidth, requiredWidth), maxWidth);
 }
 
+window.createFolder = createFolder;
 window.toggleFolder = toggleFolder;
 window.toggleAllFolders = toggleAllFolders;
 window.selectFolder = selectFolder;

@@ -14,7 +14,6 @@ let expandedFolders = []; // Açık klasörler
 // Multi-selection sistemi
 let selectedNotes = []; // Seçili notlar
 let selectedFolders = []; // Seçili klasörler
-let selectedTodos = []; // Seçili todo'lar
 let isSelecting = false; // Selection box durumu
 let selectionStartX = 0;
 let selectionStartY = 0;
@@ -32,6 +31,7 @@ let graphSettings = {
 // Folder sistemi
 let selectedColor = window.FOLDER_COLORS ? window.FOLDER_COLORS[0] : '#3b82f6'; // Varsayılan renk
 let folderToDelete = null; // Silinecek klasör ID'si
+let subFolderParentId = null; // Alt klasör oluşturulurken ana klasör ID'si
 
 // Render state
 let renderNotesTimeout = null;
@@ -62,7 +62,6 @@ window.getState = function() {
     expandedFolders,
     selectedNotes,
     selectedFolders,
-    selectedTodos,
     isSelecting,
     selectionStartX,
     selectionStartY,
@@ -71,6 +70,7 @@ window.getState = function() {
     graphSettings,
     selectedColor,
     folderToDelete,
+    subFolderParentId,
     renderNotesTimeout,
     isRendering,
     renderQueue,
@@ -104,6 +104,7 @@ window.setState = function(newState) {
   if (newState.graphSettings !== undefined) graphSettings = newState.graphSettings;
   if (newState.selectedColor !== undefined) selectedColor = newState.selectedColor;
   if (newState.folderToDelete !== undefined) folderToDelete = newState.folderToDelete;
+  if (newState.subFolderParentId !== undefined) subFolderParentId = newState.subFolderParentId;
   if (newState.renderNotesTimeout !== undefined) renderNotesTimeout = newState.renderNotesTimeout;
   if (newState.isRendering !== undefined) isRendering = newState.isRendering;
   if (newState.renderQueue !== undefined) renderQueue = newState.renderQueue;
@@ -125,7 +126,6 @@ window.searchQuery = searchQuery;
 window.expandedFolders = expandedFolders;
 window.selectedNotes = selectedNotes;
 window.selectedFolders = selectedFolders;
-window.selectedTodos = selectedTodos;
 window.isSelecting = isSelecting;
 window.selectionStartX = selectionStartX;
 window.selectionStartY = selectionStartY;

@@ -137,7 +137,14 @@ function drawConnections() {
   const filteredFolders = folders.filter(folder => {
     if (!state.searchQuery) return true;
     const folderNameMatch = folder.name.toLowerCase().includes(state.searchQuery.toLowerCase());
-    const folderNotes = notes.filter(note => note.folderId === folder.id);
+    // Genel eşleştirme fonksiyonu kullan
+    const folderNotes = notes.filter(note => {
+      if (window.doesNoteMatchFolder) {
+        return window.doesNoteMatchFolder(note.folderId, folder.id, folder);
+      }
+      // Fallback
+      return note.folderId === folder.id;
+    });
     const hasMatchingNotes = folderNotes.some(note => 
       note.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
       note.text.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
@@ -149,8 +156,14 @@ function drawConnections() {
   filteredFolders.forEach(folder => {
     if (!folder.x || !folder.y) return;
     
-    // Sadece filtrelenmiş notları al
-    const folderNotes = filteredNotes.filter(note => note.folderId === folder.id);
+    // Sadece filtrelenmiş notları al - genel eşleştirme fonksiyonu kullan
+    const folderNotes = filteredNotes.filter(note => {
+      if (window.doesNoteMatchFolder) {
+        return window.doesNoteMatchFolder(note.folderId, folder.id, folder);
+      }
+      // Fallback
+      return note.folderId === folder.id;
+    });
     
     folderNotes.forEach(note => {
       if (!note.x || !note.y) return;

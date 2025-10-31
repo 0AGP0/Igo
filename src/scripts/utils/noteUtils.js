@@ -3,8 +3,10 @@
 
 // Not için minimum genişlik hesapla
 function calculateMinWidthForNote(note) {
-  // Sabit font boyutu kullan
-  const fontSize = 20;
+  if (!note || !note.title) return 280; // Varsayılan genişlik
+  
+  // Not kartındaki başlık font boyutunu kullan (CSS'de 30px)
+  const fontSize = 30;
   
   // Başlık genişliğini hesapla
   const tempDiv = document.createElement('div');
@@ -17,7 +19,10 @@ function calculateMinWidthForNote(note) {
   tempDiv.style.overflowWrap = 'break-word';
   tempDiv.style.wordBreak = 'break-word';
   tempDiv.style.whiteSpace = 'normal';
-  tempDiv.style.width = '300px'; // Maksimum genişlik sınırı
+  tempDiv.style.fontFamily = 'var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)';
+  // Maksimum genişlik sınırı yok, başlığın tam genişliğini al
+  tempDiv.style.width = 'auto';
+  tempDiv.style.maxWidth = 'none';
   tempDiv.textContent = note.title;
   
   document.body.appendChild(tempDiv);
@@ -25,16 +30,12 @@ function calculateMinWidthForNote(note) {
   const textHeight = tempDiv.offsetHeight;
   document.body.removeChild(tempDiv);
   
-  // Eğer metin çok satıra yayıldıysa, genişliği artır
-  const expectedHeight = fontSize * 1.4;
-  const isMultiLine = textHeight > expectedHeight * 1.5;
+  // Başlık genişliği + padding (her iki tarafta 12px = 24px)
+  const padding = 24; // .note .head padding: 0 12px
+  const minWidth = textWidth + padding;
   
-  // Başlık genişliği + padding + butonlar
-  const buttonsWidth = 60; // Edit + Silme + gap
-  const padding = 32; // 16px her iki tarafta
-  const minWidth = textWidth + padding + buttonsWidth;
-  
-  return Math.max(200, minWidth); // En az 200px
+  // Minimum genişlik garantisi (280px) ama başlık daha uzunsa onu kullan
+  return Math.max(280, Math.ceil(minWidth));
 }
 
 // Global exports

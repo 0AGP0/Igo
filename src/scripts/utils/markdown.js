@@ -62,9 +62,31 @@ function decodeHtmlEntities(text) {
 }
 
 // HTML içeriğini işle ve tablo stillerini uygula
-function processHtmlContent(html) {
+function processHtmlContent(html, removeImages = false) {
   // HTML entity'lerini decode et
   html = decodeHtmlEntities(html);
+  
+  // Eğer resimler çıkarılacaksa (kart preview için)
+  if (removeImages) {
+    // TÜM resimlerin HTML'ini çıkar (.media klasöründen olanlar)
+    // Markdown image syntax: ![alt](path)
+    html = html.replace(/!\[([^\]]*)\]\([^)]*\.media[^)]*\)/gi, '');
+    // HTML img tag'leri: <img src=".../.media/...">
+    html = html.replace(/<img[^>]+src=["'][^"']*\.media[^"']*["'][^>]*>/gi, '');
+    html = html.replace(/<img[^>]*src=["'][^"']*\.media[^"']*["'][^>]*[^>]*>/gi, '');
+    // Vditor figure tag'leri ile birlikte gelen resimler
+    html = html.replace(/<figure[^>]*>[\s\S]*?<img[^>]*src=["'][^"']*\.media[^"']*["'][^>]*>[\s\S]*?<\/figure>/gi, '');
+    html = html.replace(/<figure[^>]*>[\s\S]*?<\/figure>/gi, (match) => {
+      if (match.includes('.media')) return '';
+      return match;
+    });
+    // Vditor özel formatları
+    html = html.replace(/<img[^>]*class=["'][^"']*vditor[^"']*["'][^>]*src=["'][^"']*\.media[^"']*["'][^>]*>/gi, '');
+    html = html.replace(/<img[^>]*data-src=["'][^"']*\.media[^"']*["'][^>]*>/gi, '');
+    // Boş p, div tag'lerini temizle
+    html = html.replace(/<p[^>]*>\s*<\/p>/gi, '');
+    html = html.replace(/<div[^>]*>\s*<\/div>/gi, '');
+  }
   
   // Tablo stillerini uygula
   html = html.replace(/<table>/g, '<table class="md-table">');
@@ -74,13 +96,68 @@ function processHtmlContent(html) {
   return html;
 }
 
-// Markdown render - CKEditor 5 HTML desteği ile
+// Markdown render - Vditor HTML desteği ile
 function renderMarkdown(text) {
   if (!text) return '';
 
-  // Eğer text HTML tag'leri içeriyorsa (CKEditor 5'den geliyorsa), direkt kullan
+  // Eğer text HTML tag'leri içeriyorsa (Vditor'dan geliyorsa), işle
   if (text.includes('<') && text.includes('>')) {
-    return processHtmlContent(text);
+    // ÖNCE: İçerikte Markdown formatında resim varsa, onları HTML'e çevir (HTML içerik içinde de olabilirler)
+    // Örnek: <audio>...</audio>![resim](file://path)
+    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%;height:auto;display:block;margin:8px 0;">');
+    
+    // ÖNCE: HTML içerikte Markdown formatında checkbox varsa, onları HTML'e çevir
+    // Örnek: <audio>...</audio>- [ ] görev veya * [ ] görev veya *[ ] görev (boşluksuz)
+    // Hem - hem de * formatını destekle, HTML tag'lerden sonra veya satır başında olabilir
+    // Çoklu regex ile farklı formatları yakala
+    
+    // Format 1: Boşluklu: "- [ ] görev" veya "* [ ] görev"
+    text = text.replace(/(<\/[^>]+>|^|\n)\s*([-*+])\s+\[\s*\]\s+(.+?)(?=\s*(?:<[^>]+>|$|\n))/gi, 
+      '$1<div class="checklist-item"><input type="checkbox" class="checklist-checkbox"><span class="checklist-text">$3</span></div>');
+    text = text.replace(/(<\/[^>]+>|^|\n)\s*([-*+])\s+\[x\]\s+(.+?)(?=\s*(?:<[^>]+>|$|\n))/gim, 
+      '$1<div class="checklist-item"><input type="checkbox" class="checklist-checkbox" checked><span class="checklist-text">$3</span></div>');
+    
+    // Format 2: Boşluksuz: "*[ ] görev"
+    text = text.replace(/(<\/[^>]+>|^|\n)\s*([-*+])\[\s*\]\s+(.+?)(?=\s*(?:<[^>]+>|$|\n))/gi, 
+      '$1<div class="checklist-item"><input type="checkbox" class="checklist-checkbox"><span class="checklist-text">$3</span></div>');
+    text = text.replace(/(<\/[^>]+>|^|\n)\s*([-*+])\[x\]\s+(.+?)(?=\s*(?:<[^>]+>|$|\n))/gim, 
+      '$1<div class="checklist-item"><input type="checkbox" class="checklist-checkbox" checked><span class="checklist-text">$3</span></div>');
+    
+    // Format 3: HTML tag içindeki metin içinde: <p>- [ ] görev</p>
+    text = text.replace(/<([^>]+)>([^<]*?)\s*([-*+])\s*\[\s*\]\s+(.+?)(?=\s*<)/gi, 
+      '<$1>$2<div class="checklist-item"><input type="checkbox" class="checklist-checkbox"><span class="checklist-text">$4</span></div>');
+    text = text.replace(/<([^>]+)>([^<]*?)\s*([-*+])\s*\[x\]\s+(.+?)(?=\s*<)/gim, 
+      '<$1>$2<div class="checklist-item"><input type="checkbox" class="checklist-checkbox" checked><span class="checklist-text">$4</span></div>');
+    
+    // HTML içerikte checkbox'ları kontrol et
+    // ÖNEMLİ: Kart preview için resimleri çıkarmak gerekiyor
+    // Ama burada removeImages flag'i yok çünkü bu fonksiyon hem kart hem editör için kullanılıyor
+    // Kart preview'da render sonrası temizleme yapılacak
+    let html = processHtmlContent(text);
+    
+    // Eğer HTML içerikte zaten checkbox yapısı varsa (Vditor'dan geliyorsa), olduğu gibi bırak
+    // Ama eğer checkbox input'ları yoksa markdown formatını işle
+    if (!html.includes('class="checklist-checkbox"') && !html.includes('type="checkbox"')) {
+      // HTML içerikte markdown checkbox formatını HTML'e çevir (henüz işlenmemişse)
+      html = html.replace(/<p[^>]*>- \[ \](.+?)<\/p>/gi, 
+        '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox"><span class="checklist-text">$1</span></div>');
+      html = html.replace(/<p[^>]*>- \[x\](.+?)<\/p>/gi, 
+        '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox" checked><span class="checklist-text">$1</span></div>');
+      html = html.replace(/<p[^>]*>\*\s*\[ \](.+?)<\/p>/gi, 
+        '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox"><span class="checklist-text">$1</span></div>');
+      html = html.replace(/<p[^>]*>\*\s*\[x\](.+?)<\/p>/gi, 
+        '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox" checked><span class="checklist-text">$1</span></div>');
+      html = html.replace(/<br>- \[ \](.+?)(<br|<\/p>)/gi, 
+        '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox"><span class="checklist-text">$1</span></div>$2');
+      html = html.replace(/<br>- \[x\](.+?)(<br|<\/p>)/gi, 
+        '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox" checked><span class="checklist-text">$1</span></div>$2');
+      html = html.replace(/<br>\*\s*\[ \](.+?)(<br|<\/p>)/gi, 
+        '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox"><span class="checklist-text">$1</span></div>$2');
+      html = html.replace(/<br>\*\s*\[x\](.+?)(<br|<\/p>)/gi, 
+        '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox" checked><span class="checklist-text">$1</span></div>$2');
+    }
+    
+    return html;
   }
 
   // Markdown içeriği HTML'e dönüştür
@@ -94,6 +171,24 @@ function renderMarkdown(text) {
   html = html.replace(/&amp;amp;nbsp;/g, '');
   html = html.replace(/&amp;nbsp;/g, '');
   
+  // CHECKBOX'LARI ÖNCE İŞLE (çok satırlı içerikte çalışması için)
+  // Satır başındaki checkbox'lar: -, *, + destekle (boşluklu veya boşluksuz)
+  // Örnek: "- [ ] görev" veya "* [ ] görev" veya "*[ ] görev"
+  html = html.replace(/(^|\n)\s*[-*+]\s*\[\s*\]\s*(.+?)(\n|$)/gm,
+    '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox"><span class="checklist-text">$2</span></div>');
+  html = html.replace(/(^|\n)\s*[-*+]\s*\[x\]\s*(.+?)(\n|$)/gim,
+    '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox" checked><span class="checklist-text">$2</span></div>');
+  // Boşluksuz format: *[ ] görev
+  html = html.replace(/(^|\n)\s*[-*+]\[\s*\]\s*(.+?)(\n|$)/gm,
+    '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox"><span class="checklist-text">$2</span></div>');
+  html = html.replace(/(^|\n)\s*[-*+]\[x\]\s*(.+?)(\n|$)/gim,
+    '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox" checked><span class="checklist-text">$2</span></div>');
+  
+  // Debug: Console'a checkbox'ları yazdır
+  if (html.includes('checklist-item')) {
+    console.log('✅ Checkbox\'lar bulundu ve işlendi');
+  }
+  
   // 1. Tabloları geçici olarak koru (işaretleyicilerle değiştir)
   const tables = [];
   html = html.replace(/(\|[^\n]+\|[^\n]*\n)+/g, (match) => {
@@ -102,66 +197,54 @@ function renderMarkdown(text) {
     return tableId;
   });
   
-  // 2. Linkleri işle (escapeHtml'den önce)
+  // 2. Resimleri işle (linklerden ÖNCE, yoksa resim link olarak işlenir)
+  // Markdown image syntax: ![alt](path)
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%;height:auto;display:block;margin:8px 0;">');
+  
+  // 3. Linkleri işle (escapeHtml'den önce)
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
   
-  // 3. HTML escape et - sadece gerekli karakterler için
+  // 4. HTML escape et - sadece gerekli karakterler için
   // html = escapeHtml(html); // Bu satır kaldırıldı - HTML entity sorununa neden oluyordu
-  
-  // 4. Diğer markdown elementleri
-  // Başlıklar
-  html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+
+  // 5. Diğer markdown elementleri
+  // Başlıklar (tüm seviyeleri destekle)
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^##### (.+)$/gm, '<h5>$1</h5>');
+  html = html.replace(/^###### (.+)$/gm, '<h6>$1</h6>');
   
   // Başlıklardan sonraki fazla boş satırları temizle
-  html = html.replace(/(<\/h[2-4]>)\n+/g, '$1\n');
+  html = html.replace(/(<\/h[1-6]>)\n+/g, '$1\n');
   
   // Alıntılar
   html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
   
-  // Checklist (önce işle, liste ile karışmasın)
-  html = html.replace(/^\s*-\s*\[\s*\]\s*(.*)$/gm, 
-    '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox"><span class="checklist-text">$1</span></div>');
-  html = html.replace(/^\s*-\s*\[x\]\s*(.*)$/gmi, 
-    '<div class="checklist-item"><input type="checkbox" class="checklist-checkbox" checked><span class="checklist-text">$1</span></div>');
+  // Listeler - basit regex yaklaşımı (checkbox olmayan listeler)
+  // Liste satırlarını bul ve işle (checkbox olmayan satırlar)
+  // ÖNEMLİ: Checkbox'lar yukarıda zaten işlendi, sadece checkbox olmayan liste satırlarını işle
+  html = html.replace(/^(\s*)-\s+(.+?)$/gm, (match, indent, text) => {
+    // Eğer checkbox ise işleme (zaten yukarıda işlendi, checklist-item içinde)
+    // Checkbox olan satırlar artık checklist-item div'i içinde olduğu için bunları atla
+    if (match.includes('checklist-item') || match.includes('checklist-checkbox')) {
+      return match; // Zaten checkbox olarak işlenmiş, olduğu gibi bırak
+    }
+    // [ ] veya [x] içeriyorsa checkbox, işleme
+    if (/\[\s*\]|\[x\]/i.test(text)) {
+      return match; // Checkbox satırlarını olduğu gibi bırak (zaten yukarıda işlendi)
+    }
+    return '<ul><li>' + text + '</li></ul>';
+  });
   
-  // Listeler - checklist'ten sonra işle
-  // Liste bloklarını bul ve <ul> içine al
-  html = html.split('\n').map((line, i, arr) => {
-    // Checklist zaten işlenmiş mi kontrol et
-    if (line.includes('<div class="checklist-item">')) {
-      return line; // Checklist'i atla
-    }
-    
-    // Nokta liste kontrolü (sadece "-" ile başlayanlar)
-    const isListItem = /^\s*-\s+(.+)$/.test(line);
-    
-    if (isListItem) {
-      // Önceki liste öğesini bul (boş satırları atla)
-      let prevIsListItem = false;
-      for (let j = i - 1; j >= 0; j--) {
-        if (arr[j].trim() === '') continue; // Boş satırı atla
-        prevIsListItem = /^\s*-\s+/.test(arr[j]) && !arr[j].includes('<div class="checklist-item">');
-        break;
-      }
-      
-      // Sonraki liste öğesini bul (boş satırları atla)
-      let nextIsListItem = false;
-      for (let j = i + 1; j < arr.length; j++) {
-        if (arr[j].trim() === '') continue; // Boş satırı atla
-        nextIsListItem = /^\s*-\s+/.test(arr[j]) && !arr[j].includes('<div class="checklist-item">');
-        break;
-      }
-      
-      const content = line.replace(/^\s*-\s+(.+)$/, '$1');
-      let result = `<li>${content}</li>`;
-      if (!prevIsListItem) result = '<ul>' + result; // Liste başlangıcı
-      if (!nextIsListItem) result = result + '</ul>'; // Liste bitişi
-      return result;
-    }
-    return line;
-  }).join('\n');
+  // Ardışık </ul><ul> tag'lerini birleştir
+  html = html.replace(/<\/ul>\s*<ul>/g, '');
+  
+  // Yatay çizgiler (---) - satır sonlarından önce işle
+  html = html.replace(/^---$/gm, '<hr class="custom-hr">');
+  html = html.replace(/^  ---$/gm, '<hr class="custom-hr">');
+  html = html.replace(/^    ---$/gm, '<hr class="custom-hr">');
   
   // Satır sonları
   html = html.replace(/\n/g, '<br>');
@@ -176,6 +259,9 @@ function renderMarkdown(text) {
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
   html = html.replace(/`(.+?)`/g, '<code>$1</code>');
+  
+  // Emoji desteği - Unicode emoji'leri koru
+  // Emoji'ler zaten Unicode formatında olduğu için ek işlem gerekmiyor
   
   // Etiketler ve wikilink'ler
   html = html.replace(/#([a-z0-9ğüşiöçıİĞÜŞİÖÇ\-_]+)(?![^<]*>)/g, '<span class="tagtok">#$1</span>');
@@ -286,8 +372,20 @@ function htmlToMarkdown(html) {
   markdown = markdown.replace(/<\/ol>/g, '\n');
   markdown = markdown.replace(/<li[^>]*>(.*?)<\/li>/g, '1. $1\n');
   
-  // Alıntıları işle
-  markdown = markdown.replace(/<blockquote[^>]*>(.*?)<\/blockquote>/g, '> $1\n');
+  // Alıntıları işle - <blockquote><p>metin</p></blockquote> formatını destekle
+  markdown = markdown.replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gs, (match, content) => {
+    // İçerikteki <p> tag'lerini temizle ve metni al
+    let cleanContent = content.replace(/<p[^>]*>(.*?)<\/p>/g, '$1').trim();
+    
+    // İçerikteki format tag'lerini markdown'a dönüştür
+    cleanContent = cleanContent.replace(/<strong[^>]*>(.*?)<\/strong>/g, '**$1**');
+    cleanContent = cleanContent.replace(/<b[^>]*>(.*?)<\/b>/g, '**$1**');
+    cleanContent = cleanContent.replace(/<em[^>]*>(.*?)<\/em>/g, '*$1*');
+    cleanContent = cleanContent.replace(/<i[^>]*>(.*?)<\/i>/g, '*$1*');
+    cleanContent = cleanContent.replace(/<code[^>]*>(.*?)<\/code>/g, '`$1`');
+    
+    return `> ${cleanContent}\n`;
+  });
   
   // Yatay çizgileri işle (HR etiketleri)
   markdown = markdown.replace(/<hr[^>]*class="custom-hr"[^>]*>/gi, '\n---\n');

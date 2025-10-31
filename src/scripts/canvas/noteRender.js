@@ -24,7 +24,7 @@ function renderNotes() {
 
 // Viewport hesaplama
 function getViewportBounds() {
-  const VIEWPORT_BUFFER = window.VIEWPORT_BUFFER || 800;
+  const VIEWPORT_BUFFER = window.VIEWPORT_BUFFER || 1200; // Buffer'ı artırdık
   const board = document.getElementById('board');
   const boardRect = board.getBoundingClientRect();
   const transform = board.style.transform;
@@ -71,7 +71,7 @@ function getVisibleCards() {
   return window.notes.filter(note => isCardInViewport(note, viewport));
 }
 
-// Anında render fonksiyonu - UI güncellemeleri için (yeni kart ekleme)
+// Anında render fonksiyonu - UI güncellemeleri için (yeni kart ekleme, filtreleme, arama)
 function renderNotesImmediate() {
   // Timeout'u iptal et
   if (_renderNotesTimeout) {
@@ -79,8 +79,19 @@ function renderNotesImmediate() {
     _renderNotesTimeout = null;
   }
   
-  // Yeni kart ekleme - animasyon olsun
-  _isViewportChange = false;
+  // Filtreleme ve arama için animasyon olmasın, anında render
+  const state = window.getState();
+  const isFiltering = (state.searchQuery && state.searchQuery.trim() !== '') || 
+                      (state.activeTagFilters && state.activeTagFilters.length > 0);
+  
+  if (isFiltering) {
+    // Filtreleme yapılıyorsa viewport değişikliği gibi davran (animasyon olmadan)
+    _isViewportChange = true;
+  } else {
+    // Yeni kart ekleme - animasyon olsun
+    _isViewportChange = false;
+  }
+  
   renderNotesInternal();
 }
 
@@ -95,8 +106,8 @@ function renderNotesForViewport() {
   // Performans için viewport render'ını sınırla
   _viewportRenderCount++;
   
-  // Her 5. viewport değişikliğinde render et (performans için)
-  if (_viewportRenderCount % 5 !== 0) {
+  // Her 3. viewport değişikliğinde render et (performans için) - daha sık render
+  if (_viewportRenderCount % 3 !== 0) {
     console.log('⏭️ Viewport render atlandı (performans için)');
     return;
   }
@@ -104,12 +115,12 @@ function renderNotesForViewport() {
   // Viewport değişikliği kontrolü - gereksiz render'ları engelle
   const currentViewport = getViewportBounds();
   
-  // Eğer viewport çok fazla değişmemişse render etme
+  // Eğer viewport çok fazla değişmemişse render etme - daha hassas kontrol
   if (_lastViewportBounds && 
-      Math.abs(currentViewport.left - _lastViewportBounds.left) < 150 &&
-      Math.abs(currentViewport.top - _lastViewportBounds.top) < 150 &&
-      Math.abs(currentViewport.right - _lastViewportBounds.right) < 150 &&
-      Math.abs(currentViewport.bottom - _lastViewportBounds.bottom) < 150) {
+      Math.abs(currentViewport.left - _lastViewportBounds.left) < 100 &&
+      Math.abs(currentViewport.top - _lastViewportBounds.top) < 100 &&
+      Math.abs(currentViewport.right - _lastViewportBounds.right) < 100 &&
+      Math.abs(currentViewport.bottom - _lastViewportBounds.bottom) < 100) {
     console.log('⏭️ Viewport değişikliği çok küçük, render atlanıyor');
     return;
   }
@@ -117,6 +128,8 @@ function renderNotesForViewport() {
   // Viewport değişikliği - animasyon olmasın
   _isViewportChange = true;
   _lastViewportBounds = currentViewport;
+  
+  console.log('🔄 Viewport değişikliği algılandı, kartlar yeniden render ediliyor');
   renderNotesInternal();
 }
 
@@ -129,8 +142,20 @@ function renderNotesInternal() {
   
   console.log(`📊 renderNotesInternal: ${notes.length} not mevcut`);
   
-  // Sadece not kartlarını temizle, todo kartlarını bırak
-  document.querySelectorAll('.note').forEach(note => note.remove());
+  // Önce bağlantı çizgilerini anında temizle (filtreleme için)
+  const existingLines = document.querySelectorAll('.connection-line, .connection-label');
+  existingLines.forEach(line => {
+    // Animasyon olmadan anında kaldır
+    line.style.display = 'none';
+    line.remove();
+  });
+  
+  // Not kartlarını anında temizle (animasyon olmadan)
+  document.querySelectorAll('.note').forEach(note => {
+    // Animasyon olmadan anında kaldır
+    note.style.display = 'none';
+    note.remove();
+  });
   
   // Render edilen kartları temizle (viewport değişikliğinde)
   if (_isViewportChange) {
@@ -162,9 +187,15 @@ function renderNotesInternal() {
     filteredNotes.includes(note)
   );
   
-  // İlk yüklemede viewport filtering çalışmazsa tüm notları göster
+  // İlk yüklemede veya viewport filtering çalışmazsa tüm notları göster
   if (visibleNotes.length === 0 && filteredNotes.length > 0) {
-    console.log('⚠️ Viewport boş, tüm notları gösteriliyor (ilk yükleme)');
+    console.log('⚠️ Viewport boş, tüm notları gösteriliyor (ilk yükleme veya viewport sorunu)');
+    visibleNotes = filteredNotes;
+  }
+  
+  // Eğer viewport'da çok az kart varsa ve daha fazla not varsa, tümünü göster
+  if (visibleNotes.length < 3 && filteredNotes.length > visibleNotes.length) {
+    console.log('⚠️ Viewport\'ta çok az kart var, tüm notları gösteriliyor');
     visibleNotes = filteredNotes;
   }
   
@@ -179,11 +210,18 @@ function renderNotesInternal() {
       x = note.x;
       y = note.y;
     } else {
-      // Klasöre göre pozisyonlandır
-      const folder = folders.find(f => f.id === note.folderId);
-      if (folder && folder.x !== undefined && folder.y !== undefined) {
-        // Klasör varsa onun altına yerleştir
-        const folderNotes = filteredNotes.filter(n => n.folderId === note.folderId);
+        // Klasöre göre pozisyonlandır - genel eşleştirme fonksiyonu kullan
+        const folder = window.findFolderForNote ? window.findFolderForNote(note.folderId, folders) : folders.find(f => f.id === note.folderId);
+        if (folder && folder.x !== undefined && folder.y !== undefined) {
+          // Klasör varsa onun altına yerleştir
+          // Klasör ID eşleştirmesi - genel fonksiyon kullan
+          const folderNotes = filteredNotes.filter(n => {
+            if (window.doesNoteMatchFolder) {
+              return window.doesNoteMatchFolder(n.folderId, folder.id, folder);
+            }
+            // Fallback
+            return n.folderId === folder.id;
+          });
         const noteIndexInFolder = folderNotes.indexOf(note);
         const notesPerRow = 2; // Her satırda 2 not
         const row = Math.floor(noteIndexInFolder / notesPerRow);
@@ -204,7 +242,14 @@ function renderNotesInternal() {
           const filteredFolders = folders.filter(folder => {
             if (!state.searchQuery) return true;
             const folderNameMatch = folder.name.toLowerCase().includes(state.searchQuery.toLowerCase());
-            const folderNotes = notes.filter(note => note.folderId === folder.id);
+            // Genel eşleştirme fonksiyonu kullan
+            const folderNotes = notes.filter(note => {
+              if (window.doesNoteMatchFolder) {
+                return window.doesNoteMatchFolder(note.folderId, folder.id, folder);
+              }
+              // Fallback
+              return note.folderId === folder.id;
+            });
             const hasMatchingNotes = folderNotes.some(note => 
               note.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
               note.text.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
@@ -228,8 +273,12 @@ function renderNotesInternal() {
       note.y = y;
     }
     
-    // Not içeriğini render et
-    const renderedContent = window.renderMarkdown ? window.renderMarkdown(note.text) : note.text;
+    // BASİT ÇÖZÜM: Not içinde ne varsa kartta da öyle göster!
+    // Resimleri çıkarmadan direkt render et
+    let textForRender = note.text || note.markdownContent || '';
+    
+    // Not içeriğini render et (resimler dahil, olduğu gibi)
+    let renderedContent = window.renderMarkdown ? window.renderMarkdown(textForRender) : textForRender;
     
     // Not boyutlarını ayarla (özel boyut varsa kullan, yoksa içeriğe göre)
     let noteWidth = 280;
@@ -237,12 +286,21 @@ function renderNotesInternal() {
     
     if (note.customWidth) {
       noteWidth = note.customWidth;
+    } else if (note.width) {
+      // Önceki render'da hesaplanmış genişliği kullan
+      noteWidth = note.width;
+    } else {
+      // Başlık genişliğine göre minimum genişlik hesapla
+      if (window.calculateMinWidthForNote) {
+        const minWidth = window.calculateMinWidthForNote(note);
+        noteWidth = Math.max(noteWidth, minWidth);
+      }
     }
     if (note.customHeight) {
       noteHeight = note.customHeight;
     }
     
-    // Sabit genişlik kullan
+    // Hesaplanan genişliği kullan
     const dynamicWidth = noteWidth;
     const dynamicHeight = noteHeight;
     
@@ -255,6 +313,12 @@ function renderNotesInternal() {
     noteCard.style.width = dynamicWidth + 'px';
     noteCard.style.height = dynamicHeight + 'px';
     noteCard.style.transform = 'none'; // Transform'u sıfırla
+    
+    // Filtreleme yapılıyorsa animasyonları devre dışı bırak (hızlı kaybolsunlar)
+    if (_isViewportChange) {
+      noteCard.style.transition = 'none';
+      noteCard.style.animation = 'none';
+    }
     
     // Kart içeriğini oluştur
     noteCard.innerHTML = `
@@ -269,6 +333,32 @@ function renderNotesInternal() {
       </div>
       <div class="resize" title="Boyutlandır">⋰</div>
     `;
+    
+    // Başlık genişliğini render sonrası kontrol et ve kart genişliğini ayarla
+    if (!note.customWidth) {
+      setTimeout(() => {
+        const titleElement = noteCard.querySelector('.title');
+        if (titleElement) {
+          // Başlığın gerçek genişliğini ölç
+          const titleWidth = titleElement.scrollWidth;
+          // Kart genişliğini kontrol et
+          const cardWidth = noteCard.offsetWidth;
+          const padding = 24; // Her iki tarafta 12px = 24px
+          const requiredWidth = titleWidth + padding;
+          
+          // Eğer başlık karttan genişse, kartı genişlet
+          if (requiredWidth > cardWidth) {
+            noteCard.style.width = requiredWidth + 'px';
+            // Genişliği note objesine kaydet (sonraki render'da kullanılsın)
+            if (!note.customWidth) {
+              note.width = requiredWidth;
+            }
+          }
+        }
+      }, 0);
+    }
+    
+    // Resimler zaten render edilmiş içerikte görünür, ek bir preview eklemeye gerek yok
     
     // Klasör rengini uygula
     if (note.folderId) {
@@ -372,10 +462,6 @@ function renderNotesInternal() {
   
   // Birleşik bağlantı sistemi çalışıyor (drawConnections içinde)
   
-  // Todo kartlarını render et (eğer todo sistemi varsa)
-  if (window.todoManager && window.todoManager.renderCanvasTodos) {
-    window.todoManager.renderCanvasTodos();
-  }
   
   // Bağlantıları çiz - DOM render tamamlandıktan sonra
   setTimeout(() => {
@@ -393,43 +479,19 @@ function renderNotesInternal() {
   // Not listesini güncelle
   if (window.renderNoteList) window.renderNoteList();
   
-  // Checkbox event listener'larını ekle
+  // Checkbox event listener'larını ekle - KARTTA DEVREDİŞ
   document.querySelectorAll('.checklist-checkbox').forEach(checkbox => {
     checkbox.onclick = (e) => {
       e.stopPropagation(); // Not açılmasını engelle
+      e.preventDefault(); // Checkbox değişikliğini engelle
       
-      // Hangi nota ait olduğunu bul
-      const noteElement = checkbox.closest('.note');
-      if (!noteElement) return;
-      
-      const noteId = noteElement.id.replace('note-', '');
-      const note = window.notes.find(n => n.id === noteId);
-      if (!note) return;
-      
-      // Checkbox'ın metnini bul
-      const checkboxText = checkbox.nextElementSibling.textContent;
-      
-      // Not metninde bu checkbox'ı bul ve güncelle
-      let newText = note.text;
-      if (checkbox.checked) {
-        // Boş checkbox'ı işaretli yap
-        const escapeRegex = window.escapeRegex || ((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-        newText = newText.replace(
-          new RegExp(`^(\\s*)-\\s*\\[\\s*\\]\\s*${escapeRegex(checkboxText)}`, 'm'),
-          '$1- [x] ' + checkboxText
-        );
-      } else {
-        // İşaretli checkbox'ı boş yap
-        const escapeRegex = window.escapeRegex || ((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-        newText = newText.replace(
-          new RegExp(`^(\\s*)-\\s*\\[x\\]\\s*${escapeRegex(checkboxText)}`, 'mi'),
-          '$1- [ ] ' + checkboxText
-        );
-      }
-      
-      // Notu güncelle
-      if (window.updateNote) window.updateNote(noteId, note.title, newText);
+      // Kart üzerinde checkbox'ları devre dışı bırak
+      console.log('⚠️ Kart üzerinde checkbox değiştirilemez, not içinde kullanın');
     };
+    
+    // Checkbox'ları görsel olarak devre dışı göster
+    checkbox.style.cursor = 'default';
+    checkbox.style.pointerEvents = 'none';
   });
 }
 

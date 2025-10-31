@@ -87,6 +87,136 @@ function saveNoteToFile(note) {
   }
 }
 
+// Not dosya adını yeniden adlandır
+function renameNoteFile(note, newTitle) {
+  try {
+    if (!note || !newTitle) return;
+    
+    const oldFileName = note.fileName;
+    const extension = oldFileName.includes('.') ? oldFileName.split('.').pop() : 'md';
+    
+    // Güvenli dosya adı oluştur
+    let newFileName;
+    if (typeof window.generateFileName === 'function') {
+      newFileName = window.generateFileName(newTitle, '.' + extension);
+    } else {
+      // Basit dosya adı oluştur
+      newFileName = newTitle.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ\s]/g, '') + '.' + extension;
+    }
+    
+    // Dosya adı değiştiyse güncelle
+    if (oldFileName !== newFileName) {
+      console.log('📝 Dosya yeniden adlandırılıyor:', oldFileName, '→', newFileName);
+      
+      // Not nesnesindeki dosya adını güncelle
+      note.fileName = newFileName;
+      
+      // IPC mesajı gönder
+      ipcRenderer.send('rename-note-file', {
+        note: note,
+        oldFileName: oldFileName,
+        newFileName: newFileName
+      });
+      
+      console.log('💾 Dosya yeniden adlandırıldı ve güncellendi:', newFileName);
+    }
+  } catch (error) {
+    console.error('❌ Dosya yeniden adlandırma hatası:', error);
+  }
+}
+
+// Not dosya adını güncelle
+function updateNoteFileName(noteId, oldTitle, newTitle) {
+  try {
+    const notes = window.notes || [];
+    const note = notes.find(n => n.id === noteId);
+    
+    if (note && note.fileName) {
+      const oldFileName = note.fileName;
+      const extension = oldFileName.includes('.') ? oldFileName.split('.').pop() : 'md';
+      
+      // Güvenli dosya adı oluştur
+      let newFileName;
+      if (typeof window.generateFileName === 'function') {
+        newFileName = window.generateFileName(newTitle, '.' + extension);
+      } else {
+        // Basit dosya adı oluştur
+        newFileName = newTitle.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ\s]/g, '') + '.' + extension;
+      }
+      
+      // Dosya adı değiştiyse güncelle
+      if (oldFileName !== newFileName) {
+        console.log('📝 Dosya adı değişikliği tespit edildi:', oldFileName, '→', newFileName);
+        
+        // Not nesnesindeki dosya adını güncelle
+        note.fileName = newFileName;
+        
+        // IPC mesajı gönder - dosya adını güncelle
+        if (typeof require !== 'undefined') {
+          try {
+            const { ipcRenderer } = require('electron');
+            
+            // IPC response listener ekle
+            const responseHandler = (event, response) => {
+              try {
+                if (response && response.success) {
+                  console.log('✅ Dosya yeniden adlandırıldı:', response.oldFileName, '→', response.newFileName);
+                  if (response.message) {
+                    console.log('📝 Mesaj:', response.message);
+                  }
+                } else {
+                  console.error('❌ Dosya yeniden adlandırma başarısız:', response ? response.error : 'Bilinmeyen hata');
+                  // Hata durumunda eski dosya adını geri yükle
+                  note.fileName = oldFileName;
+                }
+              } catch (error) {
+                console.error('❌ Response handler hatası:', error);
+              } finally {
+                // Listener'ı temizle
+                try {
+                  ipcRenderer.removeListener('note-file-renamed', responseHandler);
+                } catch (removeError) {
+                  console.error('❌ Listener temizleme hatası:', removeError);
+                }
+              }
+            };
+            
+            ipcRenderer.on('note-file-renamed', responseHandler);
+            
+            // IPC mesajını güvenli şekilde gönder
+            const ipcData = {
+              noteId: noteId,
+              oldFileName: oldFileName,
+              newFileName: newFileName,
+              note: note
+            };
+            
+            // Data validasyonu
+            if (!ipcData.oldFileName || !ipcData.newFileName) {
+              console.error('❌ IPC data validasyon hatası:', ipcData);
+              return;
+            }
+            
+            ipcRenderer.send('rename-note-file', ipcData);
+          } catch (ipcError) {
+            console.error('❌ IPC gönderme hatası:', ipcError);
+            // IPC hatası durumunda eski dosya adını geri yükle
+            note.fileName = oldFileName;
+          }
+        }
+        
+        console.log('📝 Dosya adı güncelleme isteği gönderildi');
+      } else {
+        console.log('📝 Dosya adı değişmedi, güncelleme atlandı');
+      }
+    } else {
+      console.log('📝 Not veya dosya adı bulunamadı');
+    }
+  } catch (error) {
+    console.error('❌ Dosya adı güncelleme hatası:', error);
+  }
+}
+
 function loadNotes() {
   // Sadece dosyalardan notları yükle
   loadNotesFromFiles();
@@ -110,9 +240,12 @@ function loadNotesFromFiles() {
           const savedPositions = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTE_POSITIONS) || '{}');
           console.log('📍 Kaydedilmiş pozisyonlar yüklendi:', Object.keys(savedPositions).length, 'not');
           
-          // Dosyadan yüklenen notları ekle
+          // Dosyadan yüklenen notları ekle - DUPLİKASYON KONTROLÜ İLE
           if (result.notes.length > 0) {
             result.notes.forEach(fileNote => {
+              // DUPLİKASYON KONTROLÜ - Aynı ID'li not zaten var mı?
+              const existingNoteIndex = window.notes.findIndex(n => n.id === fileNote.id);
+              
               // Kaydedilmiş pozisyon varsa kullan, yoksa rastgele oluştur
               const savedPos = savedPositions[fileNote.id];
               let x, y;
@@ -127,18 +260,41 @@ function loadNotesFromFiles() {
                 console.log(`📍 "${fileNote.title}" için yeni pozisyon oluşturuldu: (${x}, ${y})`);
               }
               
-              window.notes.push({
-                ...fileNote,
-                x: x,
-                y: y,
-                width: savedPos?.width || 280,
-                height: savedPos?.height || 200,
-                folderId: fileNote.folderId || null,
-                tags: fileNote.tags || [],
-                links: fileNote.links || [],
-                isSaved: true,
-                fileName: fileNote.fileName || (generateFileName ? generateFileName(fileNote.title) : fileNote.title)
-              });
+              if (existingNoteIndex !== -1) {
+                // Not zaten var, güncelle
+                window.notes[existingNoteIndex] = {
+                  ...fileNote,
+                  x: x,
+                  y: y,
+                  width: savedPos?.width || 280,
+                  height: savedPos?.height || 200,
+                  folderId: fileNote.folderId || null,
+                  tags: fileNote.tags || [],
+                  links: fileNote.links || [],
+                  isSaved: true,
+                  fileName: fileNote.fileName || (generateFileName ? generateFileName(fileNote.title) : fileNote.title),
+                  text: fileNote.text || fileNote.markdownContent || '',
+                  markdownContent: fileNote.markdownContent || fileNote.text || ''
+                };
+                console.log(`✅ "${fileNote.title}" güncellendi (duplikasyon önlendi)`);
+              } else {
+                // Not bulunamadı, ekle
+                window.notes.push({
+                  ...fileNote,
+                  x: x,
+                  y: y,
+                  width: savedPos?.width || 280,
+                  height: savedPos?.height || 200,
+                  folderId: fileNote.folderId || null,
+                  tags: fileNote.tags || [],
+                  links: fileNote.links || [],
+                  isSaved: true,
+                  fileName: fileNote.fileName || (generateFileName ? generateFileName(fileNote.title) : fileNote.title),
+                  text: fileNote.text || fileNote.markdownContent || '',
+                  markdownContent: fileNote.markdownContent || fileNote.text || ''
+                });
+                console.log(`📝 "${fileNote.title}" eklendi`);
+              }
             });
           }
           
@@ -267,8 +423,33 @@ function loadFolders() {
         function processFolders(folderData, parentId = null, level = 0) {
           folderData.forEach(item => {
             if (item.type === 'folder') {
-              // Kaydedilen klasör verilerini bul
-              const savedFolder = savedFolders.find(f => f.id === item.id);
+              // Duplicate kontrolü - aynı ID'ye sahip klasör zaten eklenmiş mi?
+              const existingFolder = window.folders.find(f => f.id === item.id && f.path === item.path);
+              if (existingFolder) {
+                console.log(`⚠️ Duplicate klasör atlandı: ${item.name} (ID: ${item.id}, Path: ${item.path})`);
+                // Alt klasörleri işle (duplicate olsa bile)
+                if (item.children && item.children.length > 0) {
+                  processFolders(item.children, existingFolder.id, level + 1);
+                }
+                return; // Bu klasörü atla
+              }
+              
+              // Kaydedilen klasör verilerini bul (ID ve path'e göre eşleştir)
+              // Eski format klasör ID'leri için de uyumluluk ekle
+              const savedFolder = savedFolders.find(f => {
+                // ID eşleşmesi (normalize edilmiş)
+                const fIdNormalized = (f.id || '').toLowerCase().replace(/[^a-zA-Z0-9_]/g, '_');
+                const itemIdNormalized = (item.id || '').toLowerCase().replace(/[^a-zA-Z0-9_]/g, '_');
+                if (fIdNormalized === itemIdNormalized || f.id === item.id) return true;
+                
+                // Path ve name eşleşmesi
+                if (f.path === item.path && f.name === item.name) return true;
+                
+                // Eski format: Klasör adı direkt ID olarak kullanılmış olabilir
+                if (f.id === item.name || f.id === item.name.toLowerCase()) return true;
+                
+                return false;
+              });
               
               const folder = {
                 id: item.id,
@@ -279,7 +460,17 @@ function loadFolders() {
                 level: level,
                 path: item.path,
                 x: savedFolder ? savedFolder.x : undefined,
-                y: savedFolder ? savedFolder.y : undefined
+                y: savedFolder ? savedFolder.y : undefined,
+                // Eski format uyumluluk: Klasör adını da ID olarak sakla
+                // Farklı normalize formatlarını sakla (Türkçe karakter kaybı durumu için)
+                altIds: [
+                  item.name.toLowerCase().replace(/[^a-z0-9_ğüşiöçı]/g, '_'), // Türkçe karakterler dahil
+                  item.name.toLowerCase().replace(/[^a-z0-9_]/g, '_'), // ASCII (Türkçe karakter kaybı)
+                  item.name.toLowerCase(), // Lowercase
+                  item.name, // Orijinal
+                  item.name.replace(/[^a-zğüşiöçı]/g, ''), // Sadece harfler (Türkçe)
+                  item.name.toLowerCase().replace(/[^a-z]/g, '') // Sadece harfler (ASCII)
+                ]
               };
               window.folders.push(folder);
               
@@ -315,6 +506,8 @@ window.saveNotes = saveNotes;
 window.saveNotePositions = saveNotePositions;
 window.saveAllNotesToFiles = saveAllNotesToFiles;
 window.saveNoteToFile = saveNoteToFile;
+window.renameNoteFile = renameNoteFile;
+window.updateNoteFileName = updateNoteFileName;
 window.loadNotes = loadNotes;
 window.loadNotesFromFiles = loadNotesFromFiles;
 window.syncNotesWithFiles = syncNotesWithFiles;

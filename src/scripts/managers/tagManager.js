@@ -81,7 +81,14 @@ function toggleTagFilter(tag) {
   window.setState(state);
   
   renderTagCards();
-  if (window.renderNotes) window.renderNotes();
+  // Filtreleme için anında render - gecikme olmadan
+  if (window.renderNotesImmediate) {
+    window.renderNotesImmediate();
+  } else if (window.renderNotes) {
+    window.renderNotes();
+  }
+  // Bağlantı çizgilerini de anında güncelle
+  if (window.drawConnections) window.drawConnections();
   if (window.renderNoteList) window.renderNoteList();
 }
 
@@ -111,7 +118,14 @@ function removeTagFilter(tag) {
   window.setState(state);
   
   renderTagCards();
-  if (window.renderNotes) window.renderNotes();
+  // Filtreleme için anında render - gecikme olmadan
+  if (window.renderNotesImmediate) {
+    window.renderNotesImmediate();
+  } else if (window.renderNotes) {
+    window.renderNotes();
+  }
+  // Bağlantı çizgilerini de anında güncelle
+  if (window.drawConnections) window.drawConnections();
   if (window.renderNoteList) window.renderNoteList();
 }
 

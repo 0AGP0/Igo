@@ -1,5 +1,8 @@
 // ===== DOM EVENT LISTENERS =====
-// TÃ¼m UI event listener'larÄ±
+// Tüm UI event listener'ları
+
+// Global değişkenler
+let wikilinkAutocomplete = null;
 
 document.addEventListener('DOMContentLoaded', function() {
   // Buton eventleri
@@ -356,7 +359,14 @@ document.addEventListener('DOMContentLoaded', function() {
   if (searchInput) {
     searchInput.oninput = (e) => {
       searchQuery = e.target.value;
-      renderNotes();
+      // Arama için anında render - gecikme olmadan
+      if (window.renderNotesImmediate) {
+        window.renderNotesImmediate();
+      } else {
+        window.renderNotes();
+      }
+      // Bağlantı çizgilerini de anında güncelle
+      if (window.drawConnections) window.drawConnections();
       renderNoteList();
     };
     console.log('Arama input listener eklendi');
@@ -556,43 +566,15 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
     
-    // Seçili todo'ları hareket ettir
-    selectedTodos.forEach(todoId => {
-      const todo = window.todoManager?.todos.find(t => t.id === parseInt(todoId));
-      const element = document.querySelector(`.todo-canvas-card[data-todo-id="${todoId}"]`);
-      if (todo && element && element.dataset.initialTodoX !== undefined) {
-        const initialX = parseFloat(element.dataset.initialTodoX || 0);
-        const initialY = parseFloat(element.dataset.initialTodoY || 0);
-        
-        const newX = initialX + deltaX / boardZoom;
-        const newY = initialY + deltaY / boardZoom;
-        
-        // Todo objesinin hem x,y hem de position.x,position.y alanlarını güncelle
-        todo.x = newX;
-        todo.y = newY;
-        if (todo.position) {
-          todo.position.x = newX;
-          todo.position.y = newY;
-        }
-        
-        // Todo kartının transition'ını geçici olarak kapat
-        element.style.transition = 'none';
-        element.style.left = newX + 'px';
-        element.style.top = newY + 'px';
-        element.style.transform = 'none';
-      }
-    });
   }
 
   function checkAllCardsInSelection(selLeft, selTop, selWidth, selHeight) {
     const noteElements = document.querySelectorAll('.note');
     const folderElements = document.querySelectorAll('.folder-card');
-    const todoElements = document.querySelectorAll('.todo-canvas-card');
     
     
     const newSelectedNotes = [];
     const newSelectedFolders = [];
-    const newSelectedTodos = [];
     
     // Not kartlarını kontrol et
     noteElements.forEach(noteElement => {
@@ -635,36 +617,10 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
     
-    // Todo kartlarını kontrol et
-    todoElements.forEach(todoElement => {
-      const todoLeft = parseFloat(todoElement.style.left) || 0;
-      const todoTop = parseFloat(todoElement.style.top) || 0;
-      
-      // Todo kartının gerçek boyutlarını al (getBoundingClientRect kullan)
-      const rect = todoElement.getBoundingClientRect();
-      const todoWidth = rect.width || 320;
-      const todoHeight = rect.height || 200;
-      
-      
-      if (todoLeft < selLeft + selWidth &&
-          todoLeft + todoWidth > selLeft &&
-          todoTop < selTop + selHeight &&
-          todoTop + todoHeight > selTop) {
-        
-        const todoId = todoElement.dataset.todoId;
-        if (todoId) {
-          newSelectedTodos.push(todoId);
-          todoElement.classList.add('multi-selected');
-        }
-      } else {
-        todoElement.classList.remove('multi-selected');
-      }
-    });
     
     
     selectedNotes = newSelectedNotes;
     selectedFolders = newSelectedFolders;
-    selectedTodos = newSelectedTodos;
     
   }
   
@@ -682,12 +638,10 @@ document.addEventListener('DOMContentLoaded', function() {
   function clearSelection() {
     selectedNotes = [];
     selectedFolders = [];
-    selectedTodos = [];
     
     // Tüm multi-selected sınıflarını kaldır
     const noteElements = document.querySelectorAll('.note.multi-selected');
     const folderElements = document.querySelectorAll('.folder-card.multi-selected');
-    const todoElements = document.querySelectorAll('.todo-canvas-card.multi-selected');
     
     noteElements.forEach(element => {
       element.classList.remove('multi-selected');
@@ -697,9 +651,6 @@ document.addEventListener('DOMContentLoaded', function() {
       element.classList.remove('multi-selected');
     });
     
-    todoElements.forEach(element => {
-      element.classList.remove('multi-selected');
-    });
     
     if (selectionBox) {
       selectionBox.remove();
@@ -735,9 +686,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sağ tık ise drag tracking yapma (context menu için)
     if (e.button === 2) return;
     
-    // Not, klasör ve todo kartlarına mousedown handling (sadece sol tık)
-    if (e.target.closest('.note') || e.target.closest('.folder-card') || e.target.closest('.todo-canvas-card')) {
-      const element = e.target.closest('.note') || e.target.closest('.folder-card') || e.target.closest('.todo-canvas-card');
+    // Not ve klasör kartlarına mousedown handling (sadece sol tık)
+    if (e.target.closest('.note') || e.target.closest('.folder-card')) {
+      const element = e.target.closest('.note') || e.target.closest('.folder-card');
       
       // Popup'ı gizle - kart tıklanırken popup gözükmesin
       if (hoveredCard === element) {
@@ -769,19 +720,10 @@ document.addEventListener('DOMContentLoaded', function() {
           element.dataset.initialFolderX = folder.x;
           element.dataset.initialFolderY = folder.y;
         }
-      } else if (element.classList.contains('todo-canvas-card')) {
-        const todoId = parseInt(element.dataset.todoId);
-        const todo = window.todoManager?.todos.find(t => t.id === todoId);
-        if (todo) {
-          element.dataset.dragStartX = e.clientX - document.getElementById('board').getBoundingClientRect().left;
-          element.dataset.dragStartY = e.clientY - document.getElementById('board').getBoundingClientRect().top;
-          element.dataset.initialTodoX = todo.x !== undefined ? todo.x : todo.position.x;
-          element.dataset.initialTodoY = todo.y !== undefined ? todo.y : todo.position.y;
-        }
       }
       
       // Eğer çoklu seçim varsa, tüm seçili kartların başlangıç pozisyonlarını kaydet
-      const totalSelected = selectedNotes.length + selectedFolders.length + selectedTodos.length;
+      const totalSelected = selectedNotes.length + selectedFolders.length;
       if (totalSelected > 1) {
         
         // Seçili notların pozisyonlarını kaydet
@@ -804,15 +746,6 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         });
         
-        // Seçili todo'ların pozisyonlarını kaydet
-        selectedTodos.forEach(todoId => {
-          const todo = window.todoManager?.todos.find(t => t.id === parseInt(todoId));
-          const todoElement = document.querySelector(`.todo-canvas-card[data-todo-id="${todoId}"]`);
-          if (todo && todoElement) {
-            todoElement.dataset.initialTodoX = todo.x !== undefined ? todo.x : todo.position.x;
-            todoElement.dataset.initialTodoY = todo.y !== undefined ? todo.y : todo.position.y;
-          }
-        });
       }
     }
   });
@@ -823,10 +756,9 @@ document.addEventListener('DOMContentLoaded', function() {
       updateSelection(e);
     }
     
-    // Önce mousedown'dan itibaren hareket kontrolü (notlar, klasörler ve todo'lar)
+    // Önce mousedown'dan itibaren hareket kontrolü (notlar ve klasörler)
     const allNotes = document.querySelectorAll('.note');
     const allFolders = document.querySelectorAll('.folder-card');
-    const allTodos = document.querySelectorAll('.todo-canvas-card');
     
     allNotes.forEach(element => {
       if (element.dataset.clickStartX && element.dataset.clickStartY) {
@@ -866,26 +798,10 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
 
-    // Todo'ları handle et
-    allTodos.forEach(element => {
-      if (element.dataset.clickStartX && element.dataset.clickStartY) {
-        const startX = parseFloat(element.dataset.clickStartX);
-        const startY = parseFloat(element.dataset.clickStartY);
-        const distance = Math.sqrt(Math.pow(e.clientX - startX, 2) + Math.pow(e.clientY - startY, 2));
-        
-        // 5px hareket threshold'u
-        if (distance > 5 && !element.classList.contains('dragging')) {
-          element.classList.add('dragging');
-          element.dataset.isDragging = 'true';
-          element.style.cursor = 'grabbing';
-        }
-      }
-    });
 
-    // Tüm dragging kartları için drag fonksiyonunu çağır (notlar, klasörler ve todo'lar)
+    // Tüm dragging kartları için drag fonksiyonunu çağır (notlar ve klasörler)
     const draggingNotes = document.querySelectorAll('.note.dragging');
     const draggingFolders = document.querySelectorAll('.folder-card.dragging');
-    const draggingTodos = document.querySelectorAll('.todo-canvas-card.dragging');
     
     // Not kartlarını sürükle
     draggingNotes.forEach(element => {
@@ -914,7 +830,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const deltaY = currentY - startY;
         
         // Çoklu seçim kontrolü - eğer bu not seçiliyse ve başka seçili kartlar varsa
-        const totalSelected = selectedNotes.length + selectedFolders.length + selectedTodos.length;
+        const totalSelected = selectedNotes.length + selectedFolders.length;
         
         if (selectedNotes.includes(noteId) && totalSelected > 1) {
           // Tüm seçili kartları birlikte hareket ettir
@@ -965,7 +881,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const deltaY = currentY - startY;
         
         // Çoklu seçim kontrolü - eğer bu klasör seçiliyse ve başka seçili kartlar varsa
-        const totalSelected = selectedNotes.length + selectedFolders.length + selectedTodos.length;
+        const totalSelected = selectedNotes.length + selectedFolders.length;
         
         if (selectedFolders.includes(folderId) && totalSelected > 1) {
           // Tüm seçili kartları birlikte hareket ettir
@@ -985,51 +901,9 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
     
-    // Todo kartlarını sürükle
-    draggingTodos.forEach(element => {
-      const todoId = parseInt(element.dataset.todoId);
-      const todo = window.todoManager?.todos.find(t => t.id === todoId);
-      if (todo) {
-        // Mouse koordinatlarını canvas koordinatlarına çevir
-        const board = document.getElementById('board');
-        const boardRect = board.getBoundingClientRect();
-        
-        const currentX = e.clientX - boardRect.left;
-        const currentY = e.clientY - boardRect.top;
-        
-        // Başlangıç pozisyonlarını hesapla (drag başlangıcında kaydedilmiş olmalı)
-        const startX = parseFloat(element.dataset.dragStartX || 0);
-        const startY = parseFloat(element.dataset.dragStartY || 0);
-        const initialTodoX = parseFloat(element.dataset.initialTodoX || 0);
-        const initialTodoY = parseFloat(element.dataset.initialTodoY || 0);
-        
-        const deltaX = currentX - startX;
-        const deltaY = currentY - startY;
-        
-        // Ana sistemle uyumlu zoom hesaplama
-        const boardZoom = window.boardZoom || 1;
-        
-        // Çoklu seçim kontrolü - eğer bu todo seçiliyse ve başka seçili kartlar varsa
-        const totalSelected = selectedNotes.length + selectedFolders.length + selectedTodos.length;
-        
-        if (selectedTodos.includes(todoId.toString()) && totalSelected > 1) {
-          // Tüm seçili kartları birlikte hareket ettir
-          moveSelectedCards(deltaX, deltaY);
-        } else {
-          // Tek todo için normal drag
-          todo.x = initialTodoX + deltaX / boardZoom;
-          todo.y = initialTodoY + deltaY / boardZoom;
-          
-          // Element pozisyonunu güncelle
-          element.style.left = todo.x + 'px';
-          element.style.top = todo.y + 'px';
-          element.style.transform = 'none';
-        }
-      }
-    });
     
     // Bağlantıları güncelle
-    if (draggingNotes.length > 0 || draggingFolders.length > 0 || draggingTodos.length > 0) {
+    if (draggingNotes.length > 0 || draggingFolders.length > 0) {
       // Birleşik bağlantı sistemi çalışıyor (drawConnections içinde)
       drawConnections();
       renderGraph();
@@ -1045,13 +919,9 @@ document.addEventListener('DOMContentLoaded', function() {
       endSelection();
     }
     
-    // Tüm notları, klasörleri ve todo'ları kontrol et
+    // Tüm notları ve klasörleri kontrol et
     const allNotes = document.querySelectorAll('.note');
     const allFolders = document.querySelectorAll('.folder-card');
-    const allTodos = document.querySelectorAll('.todo-canvas-card');
-    
-    // Dragging kartları için değişkenleri tanımla
-    const draggingTodos = document.querySelectorAll('.todo-canvas-card.dragging');
     
     allNotes.forEach(element => {
       if (element.dataset.clickStartX && element.dataset.clickStartY) {
@@ -1152,76 +1022,9 @@ document.addEventListener('DOMContentLoaded', function() {
       saveFolders();
     });
     
-    // Todo'ları handle et
-    allTodos.forEach(element => {
-      if (element.dataset.clickStartX && element.dataset.clickStartY) {
-        const startX = parseFloat(element.dataset.clickStartX);
-        const startY = parseFloat(element.dataset.clickStartY);
-        const mouseDownTime = parseFloat(element.dataset.mouseDownTime);
-        const distance = Math.sqrt(Math.pow(e.clientX - startX, 2) + Math.pow(e.clientY - startY, 2));
-        const timeDiff = Date.now() - mouseDownTime;
-        
-        // Click detection (hareket az ve süre kısa)
-        if (distance < 5 && timeDiff < 500 && !element.classList.contains('dragging')) {
-          // Eğer checkbox, subtask checkbox'ı veya mini buton'a tıklanmadıysa
-          if (!e.target.classList.contains('todo-canvas-checkbox') && 
-              !e.target.classList.contains('todo-canvas-subtask') && 
-              !e.target.classList.contains('todo-canvas-subtask-checkbox') &&
-              !e.target.classList.contains('mini')) {
-            const todoId = parseInt(element.dataset.todoId);
-            if (window.todoManager) {
-              window.todoManager.selectTodo(todoId);
-            }
-          }
-        }
-        
-        // Drag işlemi bitti, dragging class'ını kaldır
-        element.classList.remove('dragging');
-        element.dataset.isDragging = 'false';
-        element.style.cursor = 'grab';
-        
-        // Todo kartının transition'ını geri aç
-        element.style.transition = '';
-        
-        // Click event'ini engelle (drag sonrası checkbox işaretlenmesin)
-        element.dataset.preventClick = 'true';
-        element.style.pointerEvents = 'none';
-        setTimeout(() => {
-          element.dataset.preventClick = 'false';
-          element.style.pointerEvents = 'auto';
-        }, 100); // 100ms'ye düşür
-        
-        // Pozisyonu kaydet
-        const todoId = parseInt(element.dataset.todoId);
-        const x = parseFloat(element.style.left);
-        const y = parseFloat(element.style.top);
-        
-        if (window.todoManager && window.todoManager.todos) {
-          const todo = window.todoManager.todos.find(t => t.id === todoId);
-          if (todo) {
-            todo.x = x;
-            todo.y = y;
-            todo.position.x = x;
-            todo.position.y = y;
-            window.todoManager.saveTodos();
-          }
-        }
-        
-        // Dataset'i temizle
-        delete element.dataset.clickStartX;
-        delete element.dataset.clickStartY;
-        delete element.dataset.mouseDownTime;
-        delete element.dataset.isDragging;
-        delete element.dataset.preventClick;
-        delete element.dataset.dragStartX;
-        delete element.dataset.dragStartY;
-        delete element.dataset.initialTodoX;
-        delete element.dataset.initialTodoY;
-      }
-    });
     
     // Bağlantıları güncelle
-    if (draggingNotes.length > 0 || draggingFolders.length > 0 || draggingTodos.length > 0) {
+    if (draggingNotes.length > 0 || draggingFolders.length > 0) {
       // Birleşik bağlantı sistemi çalışıyor (drawConnections içinde)
       drawConnections();
       renderGraph();

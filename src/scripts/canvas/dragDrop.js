@@ -1,16 +1,22 @@
 // ===== DRAG & DROP SYSTEM =====
 // Not ve klasör sürükleme işlemleri
 
+// Global drag state (fallback)
+let globalDraggedNoteId = null;
+
 // Klasörleri droppable yap (notları kabul edebilir)
 function makeFolderDroppable(folderElement, folderId) {
-  const state = window.getState();
   
   // Drag over - not üzerine geldiğinde
   folderElement.addEventListener('dragover', (e) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     
-    // Görsel geri bildirim
+    console.log('🎯 Drag over event:', folderId || 'klasörsüz');
+    
+    // Görsel geri bildirim - CSS class kullan
+    folderElement.classList.add('drag-over');
     folderElement.style.backgroundColor = 'rgba(125, 211, 252, 0.1)';
     folderElement.style.border = '2px dashed rgba(125, 211, 252, 0.5)';
   });
@@ -19,6 +25,7 @@ function makeFolderDroppable(folderElement, folderId) {
   folderElement.addEventListener('dragleave', (e) => {
     // Sadece klasörün dışına çıkıldığında temizle
     if (!folderElement.contains(e.relatedTarget)) {
+      folderElement.classList.remove('drag-over');
       folderElement.style.backgroundColor = '';
       folderElement.style.border = '';
     }
@@ -27,23 +34,38 @@ function makeFolderDroppable(folderElement, folderId) {
   // Drop - not bırakıldığında
   folderElement.addEventListener('drop', (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    // State'i tekrar al (drag işlemi sırasında güncellenmiş olabilir)
+    const currentState = window.getState();
+    
+    console.log('🎯 Drop event tetiklendi:', folderId || 'klasörsüz');
+    console.log('🎯 Dragged note ID:', currentState.draggedNoteId);
+    console.log('🎯 Current state:', currentState);
     
     // Görsel geri bildirimi temizle
+    folderElement.classList.remove('drag-over');
     folderElement.style.backgroundColor = '';
     folderElement.style.border = '';
     
-    if (state.draggedNoteId) {
-      console.log(`📁 Not ${state.draggedNoteId} klasöre taşınıyor: ${folderId || 'klasörsüz'}`);
+    // Hem state hem de global değişkeni kontrol et
+    const draggedId = currentState.draggedNoteId || globalDraggedNoteId;
+    
+    if (draggedId) {
+      console.log(`📁 Not ${draggedId} klasöre taşınıyor: ${folderId || 'klasörsüz'}`);
       
       // Görsel geri bildirim
-      const noteTitle = window.getNoteById ? window.getNoteById(state.draggedNoteId)?.title : 'Bilinmeyen';
+      const noteTitle = window.getNoteById ? window.getNoteById(draggedId)?.title : 'Bilinmeyen';
       if (window.showNotification) {
         window.showNotification(`Not "${noteTitle}" taşınıyor...`, 'info');
       }
       
       // Notu taşı
       if (window.changeNoteFolder) {
-        window.changeNoteFolder(state.draggedNoteId, folderId);
+        console.log('📁 changeNoteFolder çağrılıyor:', draggedId, folderId);
+        window.changeNoteFolder(draggedId, folderId);
+      } else {
+        console.error('❌ changeNoteFolder fonksiyonu bulunamadı');
       }
       
       // Not yönetim panelini hemen güncelle (asenkron işlem için)
@@ -53,9 +75,14 @@ function makeFolderDroppable(folderElement, folderId) {
       }, 100);
       
       // Drag state'i temizle
-      state.draggedNoteId = null;
-      state.draggedElement = null;
-      window.setState(state);
+      currentState.draggedNoteId = null;
+      currentState.draggedElement = null;
+      window.setState(currentState);
+      globalDraggedNoteId = null;
+    } else {
+      console.log('❌ Dragged note ID bulunamadı');
+      console.log('❌ State draggedNoteId:', currentState.draggedNoteId);
+      console.log('❌ Global draggedNoteId:', globalDraggedNoteId);
     }
   });
 }
@@ -66,15 +93,23 @@ function makeNoteDraggable(noteElement, noteId) {
   const state = window.getState();
   
   noteElement.addEventListener('dragstart', (e) => {
+    console.log('🚀 Drag start event tetiklendi:', noteId);
+    
+    // Hem state hem de global değişkeni güncelle
     state.draggedNoteId = noteId;
     state.draggedElement = noteElement;
+    globalDraggedNoteId = noteId;
     window.setState(state);
+    
+    console.log('🚀 State güncellendi:', state);
+    console.log('🚀 Global draggedNoteId güncellendi:', globalDraggedNoteId);
     
     // Drag görselini özelleştir
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', noteId);
     
     // Görsel geri bildirim
+    noteElement.classList.add('dragging');
     noteElement.style.opacity = '0.7';
     noteElement.style.transform = 'rotate(2deg)';
     
@@ -83,11 +118,13 @@ function makeNoteDraggable(noteElement, noteId) {
   
   noteElement.addEventListener('dragend', (e) => {
     // Görsel geri bildirimi temizle
+    noteElement.classList.remove('dragging');
     noteElement.style.opacity = '';
     noteElement.style.transform = '';
     
     // Tüm klasörlerin görsel geri bildirimini temizle
     document.querySelectorAll('.folder-item').forEach(folder => {
+      folder.classList.remove('drag-over');
       folder.style.backgroundColor = '';
       folder.style.border = '';
     });
@@ -98,6 +135,7 @@ function makeNoteDraggable(noteElement, noteId) {
     const state = window.getState();
     state.draggedNoteId = null;
     state.draggedElement = null;
+    globalDraggedNoteId = null;
     window.setState(state);
   });
   

@@ -1,90 +1,11 @@
 // ===== SIDEBAR RENDER =====
 // Sol sidebar'daki not ve klasör listelerinin render edilmesi
 
-// Not listesini render et
+// Not listesini render et (renderFolderList kullanır)
 function renderNoteList() {
-  const notelistContainer = document.getElementById('notelist');
-  if (!notelistContainer) return;
-  
-  const notes = window.notes || [];
-  const state = window.getState();
-  
-  // Önceki içeriği temizle
-  notelistContainer.innerHTML = '';
-  
-  if (notes.length === 0) {
-    notelistContainer.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 20px; font-size: 12px;">Henüz not yok</div>';
-    return;
+  if (window.renderFolderList) {
+    window.renderFolderList();
   }
-  
-  // Notları tarihe göre sırala (en yeni önce)
-  const sortedNotes = [...notes].sort((a, b) => {
-    return new Date(b.updatedAt) - new Date(a.updatedAt);
-  });
-  
-  // Filtreleme uygula
-  const filteredNotes = sortedNotes.filter(note => {
-    const matchesSearch = !state.searchQuery || 
-      note.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
-      note.text.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
-      note.tags.some(tag => tag.includes(state.searchQuery.toLowerCase()));
-    
-    // Aktif etiket filtreleri kontrolü (tüm seçili etiketler notda bulunmalı)
-    const matchesTagFilters = state.activeTagFilters.length === 0 || 
-      state.activeTagFilters.every(filter => note.tags.includes(filter));
-    
-    return matchesSearch && matchesTagFilters;
-  });
-  
-  // Not listesi oluştur
-  filteredNotes.forEach(note => {
-    const item = document.createElement('div');
-    item.className = `notelist-item ${note.id === state.selectedNote ? 'selected' : ''}`;
-    item.dataset.noteId = note.id;
-    
-    // Tarih formatını ayarla
-    const date = new Date(note.updatedAt);
-    const dateStr = date.toLocaleDateString('tr-TR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    
-    // İçerik snippet'i oluştur
-    const snippet = note.text.substring(0, 80) + (note.text.length > 80 ? '...' : '');
-    
-    item.innerHTML = `
-      <div class="notelist-icon">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14,2 14,8 20,8"></polyline>
-          <line x1="16" y1="13" x2="8" y2="13"></line>
-          <line x1="16" y1="17" x2="8" y2="17"></line>
-          <polyline points="10,9 9,9 8,9"></polyline>
-        </svg>
-      </div>
-      <div class="notelist-content">
-      <div class="title">${window.highlightText ? window.highlightText(note.title, state.searchQuery) : note.title}</div>
-      <div class="snippet">${window.highlightText ? window.highlightText(snippet, state.searchQuery) : snippet}</div>
-      <div class="meta">
-        <div class="tags">
-          ${note.tags.slice(0, 3).map(tag => `<span class="tag">#${tag}</span>`).join('')}
-        </div>
-        <div class="date">${dateStr}</div>
-        </div>
-      </div>
-    `;
-    
-    // Tıklama eventi
-    item.onclick = () => {
-      if (window.selectNote) window.selectNote(note.id);
-      if (window.centerOnNote) window.centerOnNote(note.id);
-    };
-    
-    notelistContainer.appendChild(item);
-  });
 }
 
 // Klasör listesini render et

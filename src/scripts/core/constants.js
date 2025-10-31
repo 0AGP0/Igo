@@ -24,7 +24,8 @@ const STORAGE_KEYS = {
   FOLDERS: 'obsidian_widget.folders.v1',
   ORB_POS: 'obsidian_widget.orbpos',
   PANEL_RECT: 'obsidian_widget.panelrect',
-  NOTE_POSITIONS: 'obsidian_widget.note_positions.v1'
+  NOTE_POSITIONS: 'obsidian_widget.note_positions.v1',
+  TUTORIAL_COMPLETED: 'obsidian_widget.tutorial_completed'
 };
 
 // Viewport-Based Rendering için sabitler

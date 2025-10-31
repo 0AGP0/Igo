@@ -56,11 +56,19 @@ function showTitlePopup(card, x, y) {
       return;
     }
     
-    titlePopup.textContent = title.textContent;
+    // Popup içeriğini oluştur
+    const titleText = title.textContent.trim();
+    if (!titleText) return;
+    
+    titlePopup.innerHTML = `
+      <div class="popup-content">
+        <span class="popup-text">${titleText}</span>
+      </div>
+    `;
     
     // Smooth positioning with offset
-    const offsetX = 10;
-    const offsetY = -10;
+    const offsetX = 15;
+    const offsetY = -15;
     titlePopup.style.left = (x + offsetX) + 'px';
     titlePopup.style.top = (y + offsetY) + 'px';
     
@@ -69,12 +77,12 @@ function showTitlePopup(card, x, y) {
     
     // Smooth fade in
     titlePopup.style.opacity = '0';
-    titlePopup.style.transform = 'translateY(3px) scale(0.95)';
+    titlePopup.style.transform = 'translateY(8px) scale(0.9)';
     titlePopup.classList.add('show');
     
     // Animate in
     requestAnimationFrame(() => {
-      titlePopup.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
+      titlePopup.style.transition = 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
       titlePopup.style.opacity = '1';
       titlePopup.style.transform = 'translateY(0) scale(1)';
       
@@ -83,10 +91,10 @@ function showTitlePopup(card, x, y) {
         const popupRect = titlePopup.getBoundingClientRect();
         const popupCenterX = popupRect.left + popupRect.width / 2;
         const deltaX = x - popupCenterX;
-        const maxOffset = popupRect.width * 0.2;
+        const maxOffset = popupRect.width * 0.3;
         const arrowOffset = Math.max(-maxOffset, Math.min(maxOffset, deltaX));
         titlePopup.style.setProperty('--arrow-offset', arrowOffset + 'px');
-      }, 40);
+      }, 50);
     });
   }
 }
@@ -96,7 +104,7 @@ function hideTitlePopup() {
     // Anında gizle - drag ve not açma durumlarında
     titlePopup.style.transition = 'none';
     titlePopup.style.opacity = '0';
-    titlePopup.style.transform = 'translateY(3px) scale(0.95)';
+    titlePopup.style.transform = 'translateY(8px) scale(0.9)';
     titlePopup.classList.remove('show');
     hoveredCard = null;
   }
@@ -117,8 +125,8 @@ function updateTitlePopupPosition(x, y) {
     }
     
     popupUpdateRequestId = requestAnimationFrame(() => {
-      const offsetX = 10;
-      const offsetY = -10;
+      const offsetX = 15;
+      const offsetY = -15;
       titlePopup.style.left = (x + offsetX) + 'px';
       titlePopup.style.top = (y + offsetY) + 'px';
       
@@ -131,8 +139,8 @@ function updateTitlePopupPosition(x, y) {
       const deltaX = x - popupCenterX;
       const deltaY = y - popupCenterY;
       
-      // Çıkıntı pozisyonunu hesapla (popup genişliğinin %20'si içinde)
-      const maxOffset = popupRect.width * 0.2;
+      // Çıkıntı pozisyonunu hesapla (popup genişliğinin %30'u içinde)
+      const maxOffset = popupRect.width * 0.3;
       const arrowOffset = Math.max(-maxOffset, Math.min(maxOffset, deltaX));
       
       // CSS custom property ile çıkıntı pozisyonunu ayarla

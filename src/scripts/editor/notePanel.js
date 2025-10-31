@@ -1,1674 +1,2132 @@
-// ===== CKEDITOR NOTE PANEL SYSTEM =====
-// Not düzenleme paneli - CKEditor 5 entegrasyonu
+// Not Panel Sistemi - Tamamen Yeniden Yazıldı
+// vditor-widget-design.html tasarımına göre
 
-// Panel state
+let notePanelOverlay = null;
 let notePanelCurrentNoteId = null;
-let notePanelEditor = null; // CKEditor 5 instance
+let notePanelEditor = null;
+let audioButtonObserver = null; // Observer referansını sakla
 
-// Autocomplete state
-let wikilinkAutocomplete = null;
-let selectedAutocompleteIndex = -1;
+// Not panelini aç
+function openNotePanel(noteId) {
+  console.log('🚀 Not paneli açılıyor, noteId:', noteId);
+  
+  // Mevcut paneli kapat
+  closeNotePanel();
+  
+  // Panel HTML'ini oluştur
+  createNotePanelHTML();
+  
+  // Panel'i göster
+  notePanelOverlay = document.getElementById('notePanelOverlay');
+    notePanelOverlay.classList.add('active');
+    
+  // Not ID'sini kaydet
+  notePanelCurrentNoteId = noteId;
+  
+  // Not başlığını yükle
+  loadNoteTitle(noteId);
+  
+  // Vditor'u başlat
+  initVditorEditor(noteId);
+}
 
-function openNotePanel(noteId = null) {
-  // Popup'ı gizle - not paneli açılırken
-  if (window.hideTitlePopup) window.hideTitlePopup();
+// Not panelini kapat
+function closeNotePanel() {
+  if (notePanelOverlay) {
+    notePanelOverlay.classList.remove('active');
+  }
+    notePanelCurrentNoteId = null;
+  notePanelEditor = null;
+}
+
+// Panel HTML'ini oluştur
+function createNotePanelHTML() {
+  // Mevcut paneli kaldır
+  const existingPanel = document.getElementById('notePanelOverlay');
+  if (existingPanel) {
+    existingPanel.remove();
+  }
   
-  const notePanelOverlay = document.getElementById('notePanelOverlay');
-  const notePanelTitleInput = document.getElementById('notePanelTitleInput');
-  const notePanelEditorElement = document.getElementById('notePanelEditor');
+  // Yeni panel HTML'i - KOMPAKT VE FONKSIYONEL
+  const panelHTML = `
+    <div id="notePanelOverlay" class="note-panel-overlay">
+      <div class="note-panel-container">
+        <!-- Header - Sadece kontroller -->
+        <div class="note-panel-header">
+          <div class="note-panel-title">
+            <span>📝 Not Düzenle</span>
+          </div>
+          <div class="note-panel-controls">
+            <button class="panel-control-btn" onclick="saveNotePanelNote()" title="Kaydet">💾</button>
+            <button class="panel-control-btn" onclick="closeNotePanel()" title="Kapat">❌</button>
+          </div>
+        </div>
+        
+        <!-- Title Section - Ayrı bölüm -->
+        <div class="note-title-section">
+          <div class="note-title-input-container">
+            <input type="text" id="notePanelTitleInput" class="note-panel-title-input" placeholder="Not başlığı..." />
+          </div>
+        </div>
+        
+        <!-- Editor Container -->
+        <div class="note-editor-section">
+          <div id="notePanelEditor"></div>
+        </div>
+      </div>
+    </div>
+  `;
   
-  if (notePanelOverlay && notePanelTitleInput && notePanelEditorElement) {
-    // Eski event listener'ları temizle
-    notePanelTitleInput.removeEventListener('input', window.currentTitleInputHandler);
-    if (window.currentEditorChangeHandler) {
-      // CKEditor event'lerini temizle
-      if (notePanelEditor && notePanelEditor.model) {
-        notePanelEditor.model.document.off('change:data', window.currentEditorChangeHandler);
+  // HTML'i body'ye ekle
+  document.body.insertAdjacentHTML('beforeend', panelHTML);
+  
+  // Sürükleme özelliğini ekle
+  setupPanelDrag();
+}
+
+// Not başlığını yükle
+function loadNoteTitle(noteId) {
+  const note = window.notes.find(n => n.id === noteId);
+  if (note) {
+    const titleInput = document.getElementById('notePanelTitleInput');
+    if (titleInput) {
+      titleInput.value = note.title || '';
+    }
+  }
+}
+
+// Vditor editörünü başlat
+function initVditorEditor(noteId) {
+  console.log('🚀 Vditor başlatılıyor...');
+  
+  // Not bilgisini al (upload için gerekli)
+  const note = noteId ? window.notes.find(n => n.id === noteId) : null;
+  
+  // Vditor konfigürasyonu - vditor-widget-design.html'den kopyalanan mükemmel tasarım
+  notePanelEditor = new Vditor('notePanelEditor', {
+    height: 520,
+    mode: 'wysiwyg',
+    theme: 'classic',
+    lang: 'en_US',
+    cache: { enable: false },
+    outline: { 
+      enable: true, 
+      position: 'left' 
+    },
+    placeholder: 'Buraya yazın... Typora benzeri WYSIWYG editör!',
+    upload: {
+      accept: 'image/*',
+      multiple: false,
+      handler: (files) => {
+        console.log('📤 Vditor upload handler - Dosya yükleme başlatılıyor:', files);
+        // Not bilgisini al (güncel noteId'den)
+        const currentNote = notePanelCurrentNoteId ? window.notes.find(n => n.id === notePanelCurrentNoteId) : null;
+        return handleVditorUpload(files, currentNote || note);
+      },
+      linkToImgUrl: '', // Custom handler kullanıyoruz
+      linkToImgFormat: (responseText) => {
+        // Response'tan URL'yi al
+        try {
+          const data = JSON.parse(responseText);
+          if (Array.isArray(data) && data.length > 0) {
+            return data[0].url || '';
+          }
+          return data.url || data.path || '';
+        } catch (e) {
+          return responseText;
+        }
+      }
+    },
+    after: function() {
+      console.log('✅ Vditor hazır!');
+      
+      // İçeriği yükle
+      if (noteId) {
+        loadNoteContent(noteId);
+      }
+      
+      // Event'leri ayarla
+      setupVditorEvents();
+      
+      // ANINDA stilleri uygula
+      applyOutlineColors();
+      
+      // Stilleri tekrar uygula
+      setTimeout(() => applyOutlineColors(), 100);
+      setTimeout(() => applyOutlineColors(), 300);
+      
+      // Türkçe tooltip'leri ekle
+      setTimeout(() => addTurkishTooltips(), 500);
+      
+      // Custom tablo butonunu ekle
+      setTimeout(() => setupCustomTableButton(), 500);
+      
+      // Custom link butonunu ekle
+      setTimeout(() => setupCustomLinkButton(), 600);
+      
+      // BUTON EKLEME FONKSİYONU - Çok erken çalışmalı
+      function addCustomButtons() {
+        const toolbar = document.querySelector('#notePanelEditor .vditor-toolbar');
+        if (!toolbar) {
+          return false;
+        }
+        
+        // Link butonunu bul
+        const linkBtn = toolbar.querySelector('[data-type="link"]');
+        if (!linkBtn) {
+          return false;
+        }
+        
+        // Vditor'un upload ve record butonlarını bul ve icon'larını al (kaldırmadan önce)
+        // Global icon cache - ilk yüklemede icon'ları sakla
+        if (!window.vditorIconCache) {
+          window.vditorIconCache = {
+            upload: '',
+            record: ''
+          };
+        }
+        
+        // Önce butonları bul
+        const vditorUploadBtn = toolbar.querySelector('[data-type="upload"]') || 
+                                 toolbar.querySelector('[data-type="image"]') ||
+                                 toolbar.querySelector('button[title*="Upload" i]') ||
+                                 toolbar.querySelector('button[title*="Image" i]');
+        
+        let uploadIconHTML = window.vditorIconCache.upload || '';
+        if (vditorUploadBtn && !uploadIconHTML) {
+          // Butonun içeriğini direkt al - Vditor'un orijinal icon'unu kullan
+          uploadIconHTML = vditorUploadBtn.innerHTML;
+          // Cache'e kaydet
+          if (uploadIconHTML && uploadIconHTML.trim() !== '' && !uploadIconHTML.includes('🖼️')) {
+            window.vditorIconCache.upload = uploadIconHTML;
+          }
+        }
+        
+        const vditorRecordBtn = toolbar.querySelector('[data-type="record"]') ||
+                               toolbar.querySelector('button[title*="Record" i]') ||
+                               toolbar.querySelector('button[title*="Audio" i]');
+        
+        let recordIconHTML = window.vditorIconCache.record || '';
+        if (vditorRecordBtn && !recordIconHTML) {
+          // Butonun içeriğini direkt al - Vditor'un orijinal icon'unu kullan
+          recordIconHTML = vditorRecordBtn.innerHTML;
+          // Cache'e kaydet
+          if (recordIconHTML && recordIconHTML.trim() !== '' && !recordIconHTML.includes('🎤')) {
+            window.vditorIconCache.record = recordIconHTML;
+          }
+        }
+        
+        // Şimdi TÜM upload ve record butonlarını kaldır
+        const unwantedBtns = toolbar.querySelectorAll(
+          '[data-type="upload"], ' +
+          '[data-type="record"], ' +
+          'button[title*="Upload" i], ' +
+          'button[title*="upload" i], ' +
+          'button[title*="Record" i], ' +
+          'button[title*="record" i]'
+        );
+        unwantedBtns.forEach(btn => {
+          try {
+            btn.remove();
+          } catch (e) {}
+        });
+        
+        // Image butonu varsa kontrol et, yoksa ekle
+        let imageBtn = toolbar.querySelector('[data-type="image"][data-custom-handler="true"]');
+        if (!imageBtn) {
+          imageBtn = document.createElement('button');
+          imageBtn.type = 'button';
+          // Vditor'un upload icon'unu direkt kullan (orijinal icon)
+          if (uploadIconHTML && uploadIconHTML.trim() !== '') {
+            imageBtn.innerHTML = uploadIconHTML;
+          } else {
+            // Fallback: Diğer toolbar butonlarından benzer bir icon bul
+            const otherBtn = toolbar.querySelector('[data-type="table"]') || 
+                            toolbar.querySelector('[data-type="heading"]') ||
+                            toolbar.querySelector('[data-type="list"]');
+            if (otherBtn && otherBtn.innerHTML) {
+              imageBtn.innerHTML = otherBtn.innerHTML;
+            } else {
+              imageBtn.innerHTML = linkBtn.innerHTML;
+            }
+          }
+          imageBtn.className = linkBtn.className;
+          imageBtn.setAttribute('data-type', 'image');
+          imageBtn.setAttribute('data-custom-handler', 'true');
+          imageBtn.setAttribute('title', 'Resim');
+          imageBtn.style.cssText = linkBtn.style.cssText;
+          imageBtn.style.fontSize = '16px';
+          imageBtn.style.marginLeft = '4px';
+          imageBtn.style.display = 'inline-block';
+          imageBtn.style.visibility = 'visible';
+          imageBtn.style.opacity = '1';
+          
+          // Click handler
+          imageBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            const note = notePanelCurrentNoteId ? window.notes.find(n => n.id === notePanelCurrentNoteId) : null;
+            if (!note || !note.id) {
+              if (window.showNotification) window.showNotification('Önce notu kaydedin!', 'error');
+              return false;
+            }
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.onchange = async (ev) => {
+              if (ev.target.files && ev.target.files[0]) {
+                try {
+                  const result = await handleVditorUpload(ev.target.files, note);
+                  const parsed = JSON.parse(result);
+                  if (parsed && parsed.length > 0 && parsed[0].url && notePanelEditor) {
+                    const current = notePanelEditor.getValue();
+                    // Önce newline ekle (ses ile karışmaması için)
+                    const newlinePrefix = current.trim().length > 0 && !current.endsWith('\n\n') ? '\n\n' : '';
+                    notePanelEditor.setValue(current + newlinePrefix + parsed[0].url + '\n\n');
+                  }
+                } catch (error) {
+                  console.error('❌ Resim yükleme hatası:', error);
+                }
+              }
+            };
+            fileInput.click();
+            return false;
+          };
+          
+          linkBtn.parentNode.insertBefore(imageBtn, linkBtn.nextSibling);
+          console.log('✅ Image butonu eklendi');
+        } else {
+          // Var ama görünür olmayabilir
+          imageBtn.style.display = 'inline-block';
+          imageBtn.style.visibility = 'visible';
+          imageBtn.style.opacity = '1';
+        }
+        
+        // Audio butonu varsa kontrol et, yoksa ekle
+        let audioBtn = toolbar.querySelector('[data-type="audio-record"]');
+        if (!audioBtn) {
+          audioBtn = document.createElement('button');
+          audioBtn.type = 'button';
+          // Vditor'un record icon'unu direkt kullan (orijinal icon)
+          if (recordIconHTML && recordIconHTML.trim() !== '') {
+            audioBtn.innerHTML = recordIconHTML;
+          } else {
+            // Fallback: Diğer toolbar butonlarından benzer bir icon bul
+            const otherBtn = toolbar.querySelector('[data-type="table"]') || 
+                            toolbar.querySelector('[data-type="heading"]') ||
+                            toolbar.querySelector('[data-type="list"]');
+            if (otherBtn && otherBtn.innerHTML) {
+              audioBtn.innerHTML = otherBtn.innerHTML;
+            } else {
+              audioBtn.innerHTML = linkBtn.innerHTML;
+            }
+          }
+          audioBtn.className = linkBtn.className;
+          audioBtn.setAttribute('data-type', 'audio-record');
+          audioBtn.setAttribute('title', 'Ses Kaydı');
+          audioBtn.style.cssText = linkBtn.style.cssText;
+          audioBtn.style.fontSize = '16px';
+          audioBtn.style.marginLeft = '4px';
+          audioBtn.style.display = 'inline-block';
+          audioBtn.style.visibility = 'visible';
+          audioBtn.style.opacity = '1';
+          
+          // Click handler
+          audioBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            const note = notePanelCurrentNoteId ? window.notes.find(n => n.id === notePanelCurrentNoteId) : null;
+            if (!note || !note.id) {
+              if (window.showNotification) window.showNotification('Önce notu kaydedin!', 'error');
+              return false;
+            }
+            showAudioRecordingModal(note);
+            return false;
+          };
+          
+          const insertAfter = imageBtn || linkBtn;
+          insertAfter.parentNode.insertBefore(audioBtn, insertAfter.nextSibling);
+          console.log('✅ Audio butonu eklendi');
+        } else {
+          // Var ama görünür olmayabilir
+          audioBtn.style.display = 'inline-block';
+          audioBtn.style.visibility = 'visible';
+          audioBtn.style.opacity = '1';
+        }
+        
+        return true;
+      }
+      
+      // ÇOK ERKEN - Hemen deneme (50ms, 150ms, 300ms)
+      setTimeout(() => addCustomButtons(), 50);
+      setTimeout(() => addCustomButtons(), 150);
+      setTimeout(() => addCustomButtons(), 300);
+      
+      // Sürekli kontrol ve temizlik
+      if (!window.vditorButtonManager) {
+        window.vditorButtonManager = setInterval(() => {
+          const toolbar = document.querySelector('#notePanelEditor .vditor-toolbar');
+          if (toolbar) {
+            // Vditor'un istenmeyen butonlarını kaldır
+            const unwantedBtns = toolbar.querySelectorAll(
+              '[data-type="upload"], ' +
+              '[data-type="record"], ' +
+              'button[title*="Upload" i], ' +
+              'button[title*="upload" i], ' +
+              'button[title*="Record" i], ' +
+              'button[title*="record" i]'
+            );
+            unwantedBtns.forEach(btn => {
+              try {
+                btn.remove();
+              } catch (e) {}
+            });
+            
+            // Custom butonları ekle/görünür yap
+            addCustomButtons();
+          }
+        }, 150);
+      }
+      
+      // MutationObserver ile toolbar değişikliklerini izle
+      setTimeout(() => {
+        const toolbar = document.querySelector('#notePanelEditor .vditor-toolbar');
+        if (toolbar && !window.vditorToolbarObserver) {
+          window.vditorToolbarObserver = new MutationObserver(() => {
+            addCustomButtons();
+          });
+          window.vditorToolbarObserver.observe(toolbar, {
+            childList: true,
+            subtree: true,
+            attributes: false
+          });
+        }
+      }, 200);
+    }
+  });
+}
+
+// Not içeriğini yükle
+function loadNoteContent(noteId) {
+  if (!notePanelEditor || !noteId) return;
+  
+  const note = window.notes.find(n => n.id === noteId);
+  if (note) {
+    console.log('📝 Not içeriği yükleniyor:', note.title);
+    
+    const content = note.text || note.markdownContent || '';
+      
+      setTimeout(() => {
+      if (notePanelEditor && notePanelEditor.setValue) {
+        try {
+          notePanelEditor.setValue(content);
+          console.log('📝 Not içeriği yüklendi');
+        } catch (error) {
+          console.error('❌ Vditor setValue hatası:', error);
+        }
+      }
+    }, 100);
+  }
+}
+
+// Vditor event'lerini ayarla
+function setupVditorEvents() {
+  if (!notePanelEditor) return;
+  
+  // Content change event'i - daha güvenli yaklaşım
+      setTimeout(() => {
+    try {
+      const wysiwygElement = document.querySelector('#notePanelEditor .vditor-wysiwyg');
+      if (wysiwygElement) {
+        console.log('🎯 Vditor wysiwyg element bulundu');
+        
+        wysiwygElement.addEventListener('input', () => {
+          console.log('📝 İçerik değişti');
+          // Sadece kaydet butonuna basınca kaydet, otomatik kaydetme yok
+        });
+        
+        // Link'lere single-click ile direkt düzenleme modalını aç
+        wysiwygElement.addEventListener('click', (e) => {
+          const target = e.target;
+          
+          // Link veya link içindeki bir element
+          if (target.tagName === 'A' || target.closest('a')) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const linkEl = target.tagName === 'A' ? target : target.closest('a');
+            
+            // Direkt düzenleme modalını aç
+            editLink(linkEl);
+          }
+        }, true); // Capture phase
+      } else {
+        console.log('⚠️ Vditor wysiwyg element bulunamadı, event atlandı');
+      }
+    } catch (error) {
+      console.error('❌ Event handler hatası:', error);
+    }
+  }, 500); // Daha uzun bekleme süresi
+}
+
+// Debounce için timer (notePanel özel)
+let notePanelSaveTimeout = null;
+
+// Debounce ile kaydet
+function debounceSave() {
+  if (notePanelSaveTimeout) {
+    clearTimeout(notePanelSaveTimeout);
+  }
+  
+  notePanelSaveTimeout = setTimeout(() => {
+    saveCurrentNoteContent();
+    console.log('💾 Debounce ile kaydedildi');
+  }, 2000);
+}
+
+// Mevcut notu kaydet
+function saveCurrentNoteContent() {
+  if (!notePanelEditor) return;
+  
+  // Başlığı al
+  const titleInput = document.getElementById('notePanelTitleInput');
+  const title = titleInput ? titleInput.value.trim() : 'Yeni Not';
+  
+  // Yeni not mu, mevcut not mu?
+  let note = null;
+  
+  if (notePanelCurrentNoteId) {
+    // Mevcut not
+    note = window.notes.find(n => n.id === notePanelCurrentNoteId);
+    
+    // NOT VARSA TEKRAR EKLEME, SADECE GÜNCELLE
+    if (note) {
+      console.log('✅ Mevcut not güncelleniyor:', note.title);
+    } else {
+      console.error('❌ Not bulunamadı:', notePanelCurrentNoteId);
+      return;
+    }
+  } else {
+    // Yeni not oluşturuluyor
+    if (title && title !== 'Yeni Not' && title !== '') {
+      // DUPLİKASYON KONTROLÜ - Aynı başlıklı not var mı?
+      const existingNote = window.notes.find(n => n.title === title);
+      
+      if (existingNote) {
+        // Duplikasyon var, mevcut notu kullan
+        console.log('⚠️ Aynı başlıklı not zaten var, mevcut not kullanılıyor');
+        note = existingNote;
+        notePanelCurrentNoteId = existingNote.id;
+      } else {
+        // Yeni not oluştur
+        const newNote = {
+          id: 'note_' + Date.now(),
+          title: title,
+          text: '',
+          markdownContent: '',
+          x: Math.random() * 400 + 100,
+          y: Math.random() * 300 + 100,
+          width: 280,
+          height: 200,
+          tags: [],
+          links: [],
+          folderId: null,
+          fileName: title.replace(/[^a-z0-9_]/gi, '_') + '.md'
+        };
+        
+        // Önce push etme, sadece reference oluştur
+        note = newNote;
+        notePanelCurrentNoteId = newNote.id;
+        console.log('📝 Yeni not hazırlandı:', title);
+      }
+    } else {
+      if (window.showAlertModal) {
+        window.showAlertModal('Uyarı', 'Lütfen geçerli bir başlık girin!', 'warning');
+      } else {
+        alert('Lütfen geçerli bir başlık girin!');
+      }
+      return;
+    }
+  }
+  
+  if (note) {
+    try {
+      const content = notePanelEditor.getValue();
+      
+      // ESKİ içeriği al (silinen dosyaları bulmak için)
+      const oldContent = note.text || note.markdownContent || '';
+      
+      // Yeni içeriği ayarla
+      note.text = content;
+      note.markdownContent = content;
+      
+      // Silinen dosyaları bul ve sil
+      if (typeof require !== 'undefined') {
+        const { ipcRenderer } = require('electron');
+        
+        // Dosya referanslarını çıkaran fonksiyon
+        const extractFilePaths = (text) => {
+          const paths = new Set();
+          
+          // Markdown image: ![alt](path)
+          const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+          let match;
+          while ((match = imageRegex.exec(text)) !== null) {
+            let path = match[2];
+            // file:// URL'sini temizle
+            if (path.startsWith('file:///')) {
+              path = path.replace(/^file:\/\/\//, '');
+            }
+            // .media klasöründen olan dosyaları al
+            if (path && (path.includes('.media') || path.startsWith('.media'))) {
+              paths.add(path);
+            }
+          }
+          
+          // HTML img tag: <img src="path">
+          const imgTagRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+          while ((match = imgTagRegex.exec(text)) !== null) {
+            let path = match[1];
+            if (path.startsWith('file:///')) {
+              path = path.replace(/^file:\/\/\//, '');
+            }
+            // .media klasöründen olan dosyaları al
+            if (path && (path.includes('.media') || path.startsWith('.media'))) {
+              paths.add(path);
+            }
+          }
+          
+          // HTML audio tag: <audio><source src="path">
+          const audioRegex = /<audio[^>]*>[\s\S]*?<source[^>]+src=["']([^"']+)["'][^>]*>/gi;
+          while ((match = audioRegex.exec(text)) !== null) {
+            let path = match[1];
+            if (path.startsWith('file:///')) {
+              path = path.replace(/^file:\/\/\//, '');
+            }
+            // .media klasöründen olan dosyaları al
+            if (path && (path.includes('.media') || path.startsWith('.media'))) {
+              paths.add(path);
+            }
+          }
+          
+          return Array.from(paths);
+        };
+        
+        const oldFiles = extractFilePaths(oldContent);
+        const newFiles = extractFilePaths(content);
+        
+        // Silinen dosyaları bul (eskide var ama yeni içerikte yok)
+        const deletedFiles = oldFiles.filter(file => !newFiles.includes(file));
+        
+        // Silinen dosyaları sil
+        if (deletedFiles.length > 0) {
+          console.log('🗑️ Silinen dosyalar bulundu:', deletedFiles);
+          deletedFiles.forEach(async (filePath) => {
+            try {
+              const result = await ipcRenderer.invoke('delete-media-file', { filePath: filePath });
+              if (result.success) {
+                console.log('✅ Dosya silindi:', filePath);
+              } else {
+                console.log('⚠️ Dosya silinemedi:', filePath, result.error);
+              }
+            } catch (error) {
+              console.error('❌ Dosya silme hatası:', filePath, error);
+            }
+          });
+        }
+      }
+      
+      // Başlığı güncelle
+      if (title && title !== note.title) {
+        note.title = title;
+        // Dosya adını güncelle
+        if (typeof window.renameNoteFile === 'function') {
+          window.renameNoteFile(note, title);
+        }
+      }
+      
+      // Etiketleri parse et ve güncelle
+      if (window.parseTags) {
+        note.tags = window.parseTags(content);
+        console.log('🏷️ Not etiketleri güncellendi:', note.tags);
+      }
+      
+      // WINDOW.NOTES'E EKLEME/GÜNCELLEME - TEK SEVİYE
+      const noteIndex = window.notes.findIndex(n => n.id === note.id);
+      if (noteIndex !== -1) {
+        // Not bulundu, sadece güncelle (duplikasyon önlemek için)
+        window.notes[noteIndex] = note;
+        console.log('✅ Mevcut not güncellendi:', note.title);
+      } else {
+        // Not bulunamadı, ekle
+        window.notes.push(note);
+        console.log('📝 Yeni not eklendi:', note.title);
+      }
+      
+      console.log('💾 Not kaydedildi');
+      
+      // LOCALSTORAGE VE DOSYA SİSTEMİ KAYDET
+      if (typeof window.saveNotes === 'function') {
+        window.saveNotes();
+        console.log('💾 localStorage kaydedildi');
+      }
+      
+      if (typeof window.saveNoteToFile === 'function') {
+        window.saveNoteToFile(note);
+        console.log('💾 Not dosyaya kaydediliyor...');
+      }
+      
+      // NOT KARTLARINI YENİDEN RENDER ET
+      if (typeof window.renderNotes === 'function') {
+        window.renderNotes();
+        console.log('🔄 Notlar yeniden render edildi');
+      }
+      
+      // ETIKET PANELINI YENİDEN RENDER ET
+      if (typeof window.renderTags === 'function') {
+        window.renderTags();
+        console.log('🏷️ Etiket paneli güncellendi');
+      }
+      
+      // Kaydetme sonrası paneli kapat
+      closeNotePanel();
+    } catch (error) {
+      console.error('❌ Kaydetme hatası:', error);
+    }
+  }
+}
+
+// Türkçe tooltip'leri ekle
+function addTurkishTooltips() {
+  const toolbar = document.querySelector('.vditor .vditor-toolbar');
+  if (!toolbar) return;
+
+  const buttons = toolbar.querySelectorAll('button');
+  const tooltipMap = {
+    'bold': 'Kalın',
+    'italic': 'İtalik', 
+    'strikethrough': 'Üstü Çizili',
+    'quote': 'Alıntı',
+    'code': 'Kod',
+    'link': 'Bağlantı',
+    'image': 'Resim',
+    'table': 'Tablo',
+    'heading': 'Başlık',
+    'list': 'Liste',
+    'hr': 'Çizgi',
+    'undo': 'Geri Al',
+    'redo': 'Yinele',
+    'fullscreen': 'Tam Ekran',
+    'preview': 'Önizleme',
+    'edit': 'Düzenle',
+    'help': 'Yardım',
+    'settings': 'Ayarlar'
+  };
+
+  buttons.forEach(button => {
+    const title = button.getAttribute('title');
+    if (title) {
+      for (const [key, turkish] of Object.entries(tooltipMap)) {
+        if (title.toLowerCase().includes(key)) {
+          button.setAttribute('title', turkish);
+          break;
+        }
+      }
+    }
+  });
+}
+
+// Outline renklerini zorla uygula
+function applyOutlineColors() {
+  console.log('🎨 Outline renkleri uygulanıyor...');
+  
+  const applyColors = () => {
+    const outlineContainer = document.querySelector('.vditor-outline');
+    if (!outlineContainer) return;
+    
+    // Outline genişliğini zorla ayarla - KÜÇÜK BOYUT
+    outlineContainer.style.setProperty('width', '200px', 'important');
+    outlineContainer.style.setProperty('min-width', '180px', 'important');
+    outlineContainer.style.setProperty('max-width', '220px', 'important');
+    outlineContainer.style.setProperty('flex-basis', '200px', 'important');
+    outlineContainer.style.setProperty('padding', '16px', 'important');
+    
+    // Tüm link ve item'ları bul
+    const allItems = outlineContainer.querySelectorAll('a, div, span, li');
+    
+    allItems.forEach(item => {
+      const text = item.textContent || item.innerText || '';
+      
+      // Başlık seviyelerini kontrol et
+      const hasH1 = text.includes('H1') || item.classList.contains('vditor-outline__item--level-1');
+      const hasH2 = text.includes('H2') || item.classList.contains('vditor-outline__item--level-2');
+      const hasH3 = text.includes('H3') || item.classList.contains('vditor-outline__item--level-3');
+      
+      // Inline stil ile zorla uygula
+      if (hasH1 || item.getAttribute('data-type') === 'outline-h1') {
+        item.style.setProperty('color', '#a78bfa', 'important');
+        item.style.setProperty('font-weight', '600', 'important');
+        item.style.setProperty('font-size', '14px', 'important');
+      } else if (hasH2 || item.getAttribute('data-type') === 'outline-h2') {
+        item.style.setProperty('color', '#7dd3fc', 'important');
+        item.style.setProperty('font-weight', '500', 'important');
+        item.style.setProperty('font-size', '13px', 'important');
+      } else if (hasH3 || item.getAttribute('data-type') === 'outline-h3') {
+        item.style.setProperty('color', '#e9eef5', 'important');
+        item.style.setProperty('font-weight', '500', 'important');
+        item.style.setProperty('font-size', '13px', 'important');
+      } else {
+        // Varsayılan açık renk
+        item.style.setProperty('color', '#e9eef5', 'important');
+        item.style.setProperty('font-size', '13px', 'important');
+      }
+      
+      // White-space normal yap - text wrapping için
+      item.style.setProperty('white-space', 'normal', 'important');
+      item.style.setProperty('word-wrap', 'break-word', 'important');
+      item.style.setProperty('overflow', 'visible', 'important');
+      
+      // Koyu renk kontrolü - eğer koyu renkse zorla açık yap
+      const computedStyle = window.getComputedStyle(item);
+      const color = computedStyle.color;
+      const rgb = color.match(/\d+/g);
+      if (rgb && rgb.length >= 3) {
+        const r = parseInt(rgb[0]);
+        const g = parseInt(rgb[1]);
+        const b = parseInt(rgb[2]);
+        // Eğer çok koyu renkse (rgb < 100,100,100)
+        if (r < 100 && g < 100 && b < 100) {
+          item.style.setProperty('color', '#e9eef5', 'important');
+        }
+      }
+    });
+  };
+  
+  // Hemen uygula
+  applyColors();
+  
+  // Saniyede bir kontrol et
+  const intervalId = setInterval(() => {
+    applyColors();
+  }, 1000);
+  
+  // Observer ile değişiklikleri izle
+  const outlineContainer = document.querySelector('.vditor-outline');
+  if (outlineContainer) {
+    const observer = new MutationObserver(() => {
+      applyColors();
+    });
+    
+    observer.observe(outlineContainer, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'data-type']
+    });
+    
+    // Cleanup
+    setTimeout(() => {
+      clearInterval(intervalId);
+    }, 10000);
+  }
+  
+  console.log('✅ Outline renkleri uygulandı');
+}
+
+// Panel sürükleme - AKILLI DRAG
+function setupPanelDrag() {
+  const header = document.querySelector('.note-panel-header');
+  const titleSection = document.querySelector('.note-title-section');
+  const inputContainer = document.querySelector('.note-title-input-container');
+  
+  if (!header || !titleSection || !inputContainer) return;
+  
+  // IPC Renderer kontrolü
+  if (typeof require === 'undefined') {
+    console.log('⚠️ Electron ortamı yok, drag devre dışı');
+    return;
+  }
+  
+  const { ipcRenderer } = require('electron');
+  
+  // Header'dan sürükleme
+  function addDragListener(element) {
+    element.addEventListener('mousedown', (e) => {
+      // Eğer input container içindeyse normal davranış
+      if (inputContainer.contains(e.target)) {
+        return; // Normal input davranışına izin ver
+      }
+      
+      if (e.button === 0) {
+        e.preventDefault();
+        
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let dragTimer = null;
+        
+        startX = e.screenX;
+        startY = e.screenY;
+        
+        // 50ms sonra drag moduna geç
+        dragTimer = setTimeout(() => {
+          isDragging = true;
+          element.style.cursor = 'grabbing';
+          console.log('🔄 Panel drag başladı');
+          
+          const handleDrag = (dragEvent) => {
+            if (isDragging) {
+              const deltaX = dragEvent.screenX - startX;
+              const deltaY = dragEvent.screenY - startY;
+              
+              if (Math.abs(deltaX) > 0 || Math.abs(deltaY) > 0) {
+                ipcRenderer.send('move-widget', deltaX, deltaY);
+                startX = dragEvent.screenX;
+                startY = dragEvent.screenY;
+              }
+            }
+          };
+          
+          const handleUp = () => {
+            document.removeEventListener('mousemove', handleDrag);
+            document.removeEventListener('mouseup', handleUp);
+            if (dragTimer) clearTimeout(dragTimer);
+            element.style.cursor = '';
+            isDragging = false;
+          };
+          
+          document.addEventListener('mousemove', handleDrag);
+          document.addEventListener('mouseup', handleUp);
+        }, 50);
+      }
+    });
+  }
+  
+  // Header ve title section'dan sürükleme
+  addDragListener(header);
+  addDragListener(titleSection);
+}
+
+// Custom tablo butonu ekle
+function setupCustomTableButton() {
+  try {
+    const toolbar = document.querySelector('#notePanelEditor .vditor-toolbar');
+    if (!toolbar) {
+      console.log('⚠️ Toolbar bulunamadı');
+      return;
+    }
+    
+    const insertTableBtn = toolbar.querySelector('[data-type="table"]');
+    if (!insertTableBtn) {
+      console.log('⚠️ Tablo butonu bulunamadı');
+      return;
+    }
+    
+    // Vditor'un tüm event'lerini kaldır
+    const newTableBtn = insertTableBtn.cloneNode(true);
+    insertTableBtn.parentNode.replaceChild(newTableBtn, insertTableBtn);
+    
+    // Yeni click event'i ekle
+    newTableBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      console.log('📋 Custom tablo modal açılıyor...');
+      
+      // Modal'ı göster
+      showTableSizeModal();
+      
+      return false;
+    }, true);
+    
+    console.log('✅ Custom tablo butonu eklendi');
+  } catch (error) {
+    console.error('❌ Tablo butonu ekleme hatası:', error);
+  }
+}
+
+// Tablo boyutu seçim modalı
+function showTableSizeModal() {
+  const modal = document.createElement('div');
+  modal.innerHTML = `
+    <div id="tableSizeModal" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10003;display:flex;align-items:center;justify-content:center">
+      <div style="background:var(--noteditor-panel);border:1px solid var(--noteditor-border);border-radius:12px;padding:24px;width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+        <h3 style="margin:0 0 20px 0;color:var(--noteditor-text);font-size:18px;font-weight:600">📋 Tablo Boyutu</h3>
+        <div style="margin-bottom:16px">
+          <label style="display:block;margin-bottom:8px;color:var(--noteditor-text);font-size:14px">Satır Sayısı</label>
+          <input type="number" id="tableRows" min="1" max="20" value="3" style="width:100%;padding:10px;background:rgba(255,255,255,.05);border:1px solid var(--noteditor-border);border-radius:6px;color:var(--noteditor-text);font-size:14px;outline:none">
+        </div>
+        <div style="margin-bottom:20px">
+          <label style="display:block;margin-bottom:8px;color:var(--noteditor-text);font-size:14px">Sütun Sayısı</label>
+          <input type="number" id="tableCols" min="1" max="20" value="3" style="width:100%;padding:10px;background:rgba(255,255,255,.05);border:1px solid var(--noteditor-border);border-radius:6px;color:var(--noteditor-text);font-size:14px;outline:none">
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button id="cancelTableBtn" style="padding:10px 20px;background:rgba(255,255,255,.05);border:1px solid var(--noteditor-border);border-radius:6px;color:var(--noteditor-text);cursor:pointer;font-size:14px;font-weight:500">İptal</button>
+          <button id="insertTableBtn" style="padding:10px 20px;background:linear-gradient(135deg,var(--noteditor-accent),var(--noteditor-accent2));border:none;border-radius:6px;color:#0a0d12;cursor:pointer;font-size:14px;font-weight:600">Ekle</button>
+        </div>
+      </div>
+    </div>`;
+  
+  document.body.appendChild(modal);
+  
+  const rowsInput = document.getElementById('tableRows');
+  const colsInput = document.getElementById('tableCols');
+  const insertBtn = document.getElementById('insertTableBtn');
+  const cancelBtn = document.getElementById('cancelTableBtn');
+  
+  const close = () => {
+    if (document.body.contains(modal)) {
+      document.body.removeChild(modal);
+    }
+  };
+  
+  cancelBtn.onclick = close;
+  modal.addEventListener('click', (e) => {
+    if (e.target.id === 'tableSizeModal') close();
+  });
+  
+  insertBtn.onclick = () => {
+    const rows = parseInt(rowsInput.value) || 3;
+    const cols = parseInt(colsInput.value) || 3;
+    
+    console.log(`📋 Tablo ekleniyor: ${rows}x${cols}`);
+    
+    // Markdown tablo oluştur
+    let tableMarkdown = '';
+    
+    // Başlık satırı
+    tableMarkdown += '| ';
+    for (let i = 0; i < cols; i++) {
+      tableMarkdown += `Kolon ${i + 1} | `;
+    }
+    tableMarkdown += '\n';
+    
+    // Ayırıcı
+    tableMarkdown += '| ';
+    for (let i = 0; i < cols; i++) {
+      tableMarkdown += '--- | ';
+    }
+    tableMarkdown += '\n';
+    
+    // Satırlar
+    for (let row = 0; row < rows - 1; row++) {
+      tableMarkdown += '| ';
+      for (let col = 0; col < cols; col++) {
+        tableMarkdown += ` | `;
+      }
+      tableMarkdown += '\n';
+    }
+    
+    // Tabloyu ekle
+    if (notePanelEditor) {
+      try {
+        const currentValue = notePanelEditor.getValue();
+        const newValue = currentValue + '\n\n' + tableMarkdown;
+        notePanelEditor.setValue(newValue);
+        console.log('✅ Tablo eklendi');
+      } catch (error) {
+        console.error('❌ Tablo ekleme hatası:', error);
       }
     }
     
-    // Doğrudan geçilen noteId'yi kullan, yoksa selectedNote'u kullan
-    // Eğer noteId null ise yeni not modu
-    const targetNoteId = noteId !== null ? (noteId || window.selectedNote) : null;
-    console.log('🎯 Target noteId:', targetNoteId);
+    close();
+  };
+  
+  rowsInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') colsInput.focus();
+  });
+  
+  colsInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') insertBtn.click();
+  });
+  
+  rowsInput.focus();
+  rowsInput.select();
+}
+
+// Link düzenleme fonksiyonu - Kompakt tek modal (Aç, Kaydet, Sil)
+function editLink(linkElement) {
+  const currentText = linkElement.textContent || '';
+  const currentUrl = linkElement.getAttribute('href') || '';
+  
+  const modal = document.createElement('div');
+  modal.innerHTML = `
+    <div id="linkEditModal" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10003;display:flex;align-items:center;justify-content:center">
+      <div style="background:var(--noteditor-panel);border:1px solid var(--noteditor-border);border-radius:12px;padding:20px;min-width:340px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+        <h3 style="margin:0 0 16px 0;color:var(--noteditor-text);font-size:16px;font-weight:600">🔗 Bağlantı</h3>
+        <label style="display:block;color:var(--noteditor-text);font-size:13px;margin-bottom:6px">Görünen Metin</label>
+        <input id="linkTextEdit" value="${currentText}" style="width:100%;margin-bottom:12px;padding:10px;background:rgba(255,255,255,.05);border:1px solid var(--noteditor-border);border-radius:6px;color:var(--noteditor-text);font-size:14px">
+        <label style="display:block;color:var(--noteditor-text);font-size:13px;margin-bottom:6px">URL</label>
+        <input id="linkHrefEdit" value="${currentUrl}" placeholder="https://..." style="width:100%;margin-bottom:16px;padding:10px;background:rgba(255,255,255,.05);border:1px solid var(--noteditor-border);border-radius:6px;color:var(--noteditor-text);font-size:14px">
+        <div style="display:flex;gap:8px">
+          <button id="linkOpenBtn2" style="flex:1;padding:10px 14px;background:linear-gradient(135deg,var(--noteditor-accent),var(--noteditor-accent2));border:none;border-radius:6px;color:#0a0d12;font-weight:600;cursor:pointer;font-size:14px">🌐 Aç</button>
+          <button id="linkDeleteBtn" style="padding:10px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:6px;color:#ef4444;cursor:pointer;font-size:14px">🗑️ Sil</button>
+          <button id="linkEditOk" style="flex:1;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid var(--noteditor-border);border-radius:6px;color:var(--noteditor-text);cursor:pointer;font-weight:500;font-size:14px">Kaydet</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  
+  const ok = modal.querySelector('#linkEditOk');
+  const deleteBtn = modal.querySelector('#linkDeleteBtn');
+  const openBtn = modal.querySelector('#linkOpenBtn2');
+  const textIn = modal.querySelector('#linkTextEdit');
+  const hrefIn = modal.querySelector('#linkHrefEdit');
+  
+  // Aç butonuna click event'i
+  openBtn.onclick = () => {
+    const href = (hrefIn.value || '').trim();
+    if (href) {
+      const safeHref = href.match(/^https?:\/\//i) ? href : ('https://' + href);
+      window.open(safeHref, '_blank');
+    }
+    close();
+  };
+  
+  const close = () => {
+    if (document.body.contains(modal)) {
+      document.body.removeChild(modal);
+    }
+  };
+  
+  // Modal dışına tıklayınca kapat
+  modal.addEventListener('click', (e) => { 
+    if (e.target.id === 'linkEditModal') close(); 
+  });
+  
+  ok.onclick = () => {
+    const text = (textIn.value || '').trim();
+    const href = (hrefIn.value || '').trim();
     
-    // Not panelini göster
-    notePanelOverlay.classList.add('active');
+    if (!href) {
+      hrefIn.focus();
+      hrefIn.style.borderColor = '#ef4444';
+      return;
+    }
     
-    // CKEditor 5'i başlat (eğer henüz başlatılmamışsa)
-    if (!notePanelEditor) {
-      console.log('🚀 CKEditor başlatılıyor...');
-      ClassicEditor
-        .create(notePanelEditorElement, {
-          toolbar: {
-            items: [
-              'undo', 'redo', '|',
-              'heading', '|',
-              'bold', 'italic', 'underline', 'strikethrough', '|',
-              'fontSize', 'fontColor', 'fontBackgroundColor', '|',
-              'bulletedList', 'numberedList', '|',
-              'blockQuote', 'codeBlock', '|',
-              'link', '|',
-              'alignment', '|',
-              'indent', 'outdent', '|',
-              'insertTable', '|',
-              'specialCharacters', '|',
-              'removeFormat'
-            ]
-          },
-          heading: {
-            options: [
-              { model: 'paragraph', title: 'Paragraf', class: 'ck-heading_paragraph' },
-              { model: 'heading1', view: 'h1', title: 'Başlık 1', class: 'ck-heading_heading1' },
-              { model: 'heading2', view: 'h2', title: 'Başlık 2', class: 'ck-heading_heading2' },
-              { model: 'heading3', view: 'h3', title: 'Başlık 3', class: 'ck-heading_heading3' },
-              { model: 'heading4', view: 'h4', title: 'Başlık 4', class: 'ck-heading_heading4' }
-            ]
-          },
-          link: {
-            addTargetToExternalLinks: true,
-            decorators: [
-              {
-                mode: 'manual',
-                label: 'Open in a new tab',
-                attributes: {
-                  target: '_blank',
-                  rel: 'noopener noreferrer'
-                }
-              }
-            ]
-          },
-          placeholder: 'Notunuzu buraya yazın...',
-          language: 'tr',
-          htmlSupport: {
-            allow: [
-              {
-                name: 'span',
-                attributes: true,
-                classes: true,
-                styles: true
-              },
-              {
-                name: 'hr',
-                attributes: true,
-                classes: true,
-                styles: true
-              }
-            ]
-          },
-          // HR elementi için converter ekle
-          extraPlugins: [
-            function(editor) {
-              // HR elementi için schema kaydı
-              editor.model.schema.register('hr', {
-                allowWhere: '$block',
-                isBlock: true,
-                isObject: true,
-                allowAttributes: []
-              });
-              
-              // Model'den View'e converter (downcast)
-              editor.conversion.for('downcast').elementToElement({
-                model: 'hr',
-                view: {
-                  name: 'hr',
-                  classes: ['custom-hr']
-                }
-              });
-              
-              // View'den Model'e converter (upcast)
-              editor.conversion.for('upcast').elementToElement({
-                view: 'hr',
-                model: 'hr'
-              });
-            }
-          ],
-          // HTML entity encoding'ini devre dışı bırak
-          entities: false,
-          entities_latin: false,
-          basicEntities: false,
-          entities_greek: false,
-          entities_processNumerical: false
-        })
-        .then(editor => {
-          notePanelEditor = editor;
-          
-          // CKEditor'ın getData() fonksiyonunu override et - HTML entity'leri decode et
-          const originalGetData = editor.getData.bind(editor);
-          editor.getData = function() {
-            const data = originalGetData();
-            return window.decodeHtmlEntities ? window.decodeHtmlEntities(data) : data;
-          };
-          
-          console.log('📝 Editor instance:', editor);
-          
-          // Enter tuşu davranışını düzelt - başlık formatından çıkma
-          editor.model.document.on('change:data', () => {
-            const selection = editor.model.document.selection;
-            const selectedElement = selection.getSelectedElement();
-            
-            // Eğer HR elementinden sonra başlık formatındaysa, normal paragrafa çevir
-            if (selectedElement && selectedElement.name === 'paragraph') {
-              const position = selection.getFirstPosition();
-              
-              // Güvenli getSibling kontrolü
-              let previousElement = null;
-              if (position && typeof position.getSibling === 'function') {
-                previousElement = position.getSibling(-1);
-              }
-              
-              // Eğer önceki element HR ise ve mevcut element başlık formatındaysa
-              if (previousElement && previousElement.name === 'horizontalRule') {
-                const headingCommand = editor.commands.get('heading');
-                if (headingCommand && headingCommand.value) {
-                  // Başlık formatını temizle - CKEditor 5 güvenli yöntem
-                  try {
-                    headingCommand.execute();
-                  } catch (error) {
-                    // Alternatif yöntem: paragraph command kullan
-                    const paragraphCommand = editor.commands.get('paragraph');
-                    if (paragraphCommand) {
-                      paragraphCommand.execute();
-                    }
-                  }
-                }
-              }
-            }
-          });
-          
-          // Enter tuşu özel davranışı - HR sonrası başlık formatını temizle
-          editor.editing.view.document.on('keydown', (evt, data) => {
-            if (data.keyCode === 13) { // Enter tuşu
-              const selection = editor.model.document.selection;
-              const position = selection.getFirstPosition();
-              
-              // Güvenli getSibling kontrolü
-              let previousElement = null;
-              if (position && typeof position.getSibling === 'function') {
-                previousElement = position.getSibling(-1);
-              }
-              
-              // Eğer önceki element HR ise
-              if (previousElement && previousElement.name === 'horizontalRule') {
-                // Başlık formatını temizle
-                const headingCommand = editor.commands.get('heading');
-                if (headingCommand && headingCommand.value) {
-                  setTimeout(() => {
-                    try {
-                      headingCommand.execute();
-                    } catch (error) {
-                      const paragraphCommand = editor.commands.get('paragraph');
-                      if (paragraphCommand) {
-                        paragraphCommand.execute();
-                      }
-                    }
-                  }, 10);
-                }
-              }
-              
-              // HR sonrası herhangi bir yerde başlık formatından çıkma
-              const content = editor.getData();
-              if (content.includes('<hr class="custom-hr">')) {
-                // HR sonrası başlık formatından çıkma - sadece Enter tuşu ile
-                setTimeout(() => {
-                  const headingCommand = editor.commands.get('heading');
-                  if (headingCommand && headingCommand.value) {
-                    try {
-                      headingCommand.execute();
-                    } catch (error) {
-                      const paragraphCommand = editor.commands.get('paragraph');
-                      if (paragraphCommand) {
-                        paragraphCommand.execute();
-                      }
-                    }
-                  }
-                }, 10);
-              }
-            }
-          });
-          
-          // CKEditor editable alanını kontrol et
-          const editableElement = editor.ui.getEditableElement();
-          console.log('📄 Editable element:', editableElement);
-          console.log('🎯 Editable element visible:', editableElement ? editableElement.offsetParent !== null : false);
-          console.log('📝 Contenteditable:', editableElement ? editableElement.contentEditable : 'N/A');
-          
-          // CKEditor text color'ını manuel olarak ayarla
-          if (editableElement) {
-            editableElement.style.color = '#e9eef5';
-            editableElement.style.opacity = '1';
-            editableElement.style.visibility = 'visible';
-            console.log('🎨 CKEditor text color ayarlandı');
-            
-            // Tüm child elementlerin color'ını da ayarla
-            const allElements = editableElement.querySelectorAll('*');
-            allElements.forEach(el => {
-              el.style.color = '#e9eef5';
-              el.style.opacity = '1';
-            });
-            console.log('🎨 CKEditor child elements color ayarlandı');
-          }
-          
-          // Tablo CSS'ini dinamik olarak ekle
-          if (window.addTableStyles) window.addTableStyles();
-          
-          // Tablo oluşturulduğunda CSS'i yeniden uygula
-          editor.model.document.on('change:data', () => {
-            setTimeout(() => {
-              if (window.addTableStyles) window.addTableStyles();
-            }, 100);
-          });
-          
-          // CKEditor toolbar'ını kontrol et
-          let toolbarElement = editor.ui.getEditableElement().parentElement.querySelector('.ck-toolbar');
-          
-          // Eğer bulunamazsa, editor'ın kendisinden toolbar'ı al
-          if (!toolbarElement) {
-            toolbarElement = editor.ui.view.toolbar.element;
-            console.log('🔧 Toolbar editor.ui.view.toolbar.element ile bulundu:', toolbarElement);
-          }
-          
-          // Hala bulunamazsa, document'ten ara
-          if (!toolbarElement) {
-            toolbarElement = document.querySelector('.ck-toolbar');
-            console.log('🔧 Toolbar document.querySelector ile bulundu:', toolbarElement);
-          }
-          
-          console.log('🔧 Toolbar element:', toolbarElement);
-          console.log('🔧 Toolbar visible:', toolbarElement ? toolbarElement.offsetParent !== null : false);
-          
-          // CKEditor toolbar butonları için event listener'lar ekle
-          if (toolbarElement) {
-            // Tüm toolbar butonlarını bul ve event listener ekle
-            const toolbarButtons = toolbarElement.querySelectorAll('.ck-button, .ck-dropdown__button');
-            console.log('🔧 Toolbar buttons found:', toolbarButtons.length);
-            
-            // Toolbar'a genel click event ekle
-            toolbarElement.addEventListener('click', (e) => {
-              console.log('🔧 Toolbar clicked:', e.target);
-            });
-            
-            // Toolbar'ın pointer events'ini aktif et
-            toolbarElement.style.pointerEvents = 'auto';
-            
-            // Özel çizgi ekleme butonu ekle
-            addHRButton(editor, toolbarElement);
-          }
-          
-          // CKEditor'a focus ver
-          editor.editing.view.focus();
-          console.log('🎯 CKEditor focus verildi');
-          
-          // CKEditor scroll'unun çalışmasını sağla
-          const scrollableElement = editor.ui.getEditableElement();
-          if (scrollableElement) {
-            console.log('📜 CKEditor scroll desteği aktif');
-            
-            // Scroll'u en üste çek
-            scrollableElement.scrollTop = 0;
-            console.log('📜 CKEditor scroll en üste çekildi');
-            
-            // Cursor'u en üste taşı
-            const range = editor.model.createRangeIn(editor.model.document.getRoot());
-            editor.model.change(writer => {
-              writer.setSelection(range);
-            });
-            console.log('🎯 CKEditor cursor en üste taşındı');
-          }
-          
-          // Timeout ile tekrar focus ver
-          setTimeout(() => {
-            editor.editing.view.focus();
-            console.log('🎯 CKEditor timeout ile focus verildi');
-            
-            // Toolbar butonlarını tekrar kontrol et (dinamik yükleme için)
-            const toolbarElementDelayed = editor.ui.getEditableElement().parentElement.querySelector('.ck-toolbar');
-            if (toolbarElementDelayed) {
-              const toolbarButtonsDelayed = toolbarElementDelayed.querySelectorAll('.ck-button, .ck-dropdown__button');
-              console.log('🔧 Delayed toolbar buttons found:', toolbarButtonsDelayed.length);
-              
-              // CKEditor butonları için basit yapılandırma
-              toolbarButtonsDelayed.forEach((button, index) => {
-                if (!button.hasAttribute('data-igo-configured')) {
-                  button.style.pointerEvents = 'auto';
-                  button.style.cursor = 'pointer';
-                  button.setAttribute('data-igo-configured', 'true');
-                  console.log(`🔧 Delayed button ${index + 1} configured`);
-                }
-              });
-            }
-          }, 100);
-          
-          // CKEditor event handlers
-          setupCKEditorEvents(editor, editableElement);
-          
-          // Autocomplete systems
-          setupAutocomplete(editor);
-          
-          // Blockquote sistemi
-          setupBlockquoteSystem(editor);
-          
-          // Keyboard shortcuts
-          setupKeyboardShortcuts(editor);
-          
-          // Wikilink ve Tag highlighting
-          setupHighlighting(editor);
-          
-          // Mevcut not verilerini yükle
-          loadNoteData(editor, targetNoteId);
-        })
-        .catch(error => {
-          console.error('CKEditor 5 başlatılamadı:', error);
-        });
-    } else {
-      // CKEditor zaten var, sadece verileri yükle
-      notePanelOverlay.classList.add('active');
+    try {
+      const safeHref = href.match(/^https?:\/\//i) ? href : ('https://' + href);
+      linkElement.textContent = text;
+      linkElement.setAttribute('href', safeHref);
+      close();
+    } catch (err) {
+      console.error('❌ Link güncelleme hatası:', err);
+    }
+  };
+  
+  deleteBtn.onclick = () => {
+    try {
+      linkElement.remove();
+      close();
+    } catch (err) {
+      console.error('❌ Link silme hatası:', err);
+    }
+  };
+  
+  (hrefIn || textIn).focus();
+  
+  hrefIn.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') ok.click();
+  });
+}
+
+// Custom link ekleme fonksiyonu
+function setupCustomLinkButton() {
+  try {
+    const toolbar = document.querySelector('#notePanelEditor .vditor-toolbar');
+    if (!toolbar) {
+      console.log('⚠️ Toolbar bulunamadı');
+      return;
+    }
+    
+    const linkBtn = toolbar.querySelector('[data-type="link"]');
+    if (!linkBtn) {
+      console.log('⚠️ Link butonu bulunamadı');
+      return;
+    }
+    
+    // Vditor'un tüm event'lerini kaldır
+    const newLinkBtn = linkBtn.cloneNode(true);
+    linkBtn.parentNode.replaceChild(newLinkBtn, linkBtn);
+    
+    // Yeni click event'i ekle
+    newLinkBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
       
-      if (targetNoteId) {
-        const note = window.notes.find(n => n.id === targetNoteId);
-        if (note) {
-          notePanelCurrentNoteId = targetNoteId;
-          notePanelTitleInput.value = note.title === 'Başlıksız Not' ? '' : note.title;
-          // TXT ve MD dosyalarından gelen satır sonlarını HTML'e çevir
-          let textToLoad = note.text;
-          if (note.fileName && (note.fileName.endsWith('.txt') || note.fileName.endsWith('.md'))) {
-            textToLoad = textToLoad.replace(/\n/g, '<br>');
-          }
-          notePanelEditor.setData(textToLoad);
-          updateNotePanelStats(note.text);
+      console.log('🔗 Custom link modal açılıyor...');
+      
+      // Modal'ı aç
+      openLinkInsertModal();
+      
+      return false;
+    }, true);
+    
+    console.log('✅ Custom link butonu eklendi');
+  } catch (error) {
+    console.error('❌ Link butonu ekleme hatası:', error);
+  }
+}
+
+// Manuel image butonu ekle
+function addManualImageButton(toolbar) {
+  try {
+    // Link butonunu bul (referans olarak)
+    const linkBtn = toolbar.querySelector('[data-type="link"]');
+    if (!linkBtn) {
+      console.log('⚠️ Link butonu bulunamadı, image butonu eklenemedi');
+      return false;
+    }
+    
+    // Mevcut image butonunu kontrol et
+    const existingImageBtn = toolbar.querySelector('[data-type="image"][data-custom-handler="true"]');
+    if (existingImageBtn) {
+      // Varsa görünür yap ve çık
+      existingImageBtn.style.display = 'inline-block';
+      existingImageBtn.style.visibility = 'visible';
+      existingImageBtn.style.opacity = '1';
+      return true;
+    }
+    
+    // Yeni image butonu oluştur
+    const imageBtn = document.createElement('button');
+    imageBtn.type = 'button';
+    // Emoji kullan ve font-size'ı artır
+    imageBtn.innerHTML = '🖼️';
+    imageBtn.className = linkBtn.className;
+    imageBtn.setAttribute('data-type', 'image');
+    imageBtn.setAttribute('data-custom-handler', 'true');
+    imageBtn.setAttribute('title', 'Resim');
+    imageBtn.style.cssText = linkBtn.style.cssText;
+    imageBtn.style.display = 'inline-block';
+    imageBtn.style.visibility = 'visible';
+    imageBtn.style.opacity = '1';
+    imageBtn.style.fontSize = '16px';
+    imageBtn.style.lineHeight = '1';
+    imageBtn.style.padding = '6px 8px';
+    imageBtn.style.minWidth = '32px';
+    imageBtn.style.textAlign = 'center';
+    imageBtn.style.marginLeft = '4px';
+    imageBtn.style.position = 'relative';
+    imageBtn.style.zIndex = '999';
+    
+    // Link butonundan sonra ekle
+    linkBtn.parentNode.insertBefore(imageBtn, linkBtn.nextSibling);
+    
+    // Event listener ekle
+    imageBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      console.log('🖼️ Custom image seçici açılıyor...');
+      
+      const note = notePanelCurrentNoteId ? window.notes.find(n => n.id === notePanelCurrentNoteId) : null;
+      
+      if (!note || !note.id) {
+        if (window.showNotification) {
+          window.showNotification('Önce notu kaydedin!', 'error');
         }
-      } else {
-        notePanelCurrentNoteId = null;
-        notePanelTitleInput.value = '';
-        notePanelEditor.setData('');
-        updateNotePanelStats('');
+        return false;
       }
       
-      updateNotePanelStats(notePanelEditor.getData());
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      fileInput.multiple = false;
       
-      // CKEditor'a focus ver ve toolbar butonlarını kontrol et
-      setTimeout(() => {
-        notePanelEditor.editing.view.focus();
-        console.log('🎯 Mevcut CKEditor focus verildi');
-        
-        // Mevcut CKEditor toolbar butonlarını kontrol et
-        const existingToolbarElement = notePanelEditor.ui.getEditableElement().parentElement.querySelector('.ck-toolbar');
-        if (existingToolbarElement) {
-          const existingToolbarButtons = existingToolbarElement.querySelectorAll('.ck-button, .ck-dropdown__button');
-          console.log('🔧 Existing toolbar buttons found:', existingToolbarButtons.length);
+      fileInput.onchange = async (event) => {
+        const files = event.target.files;
+        if (files && files.length > 0) {
+          console.log('📤 Resim seçildi:', files[0].name);
           
-          existingToolbarButtons.forEach((button, index) => {
-            if (!button.hasAttribute('data-igo-configured')) {
-              button.style.pointerEvents = 'auto';
-              button.style.cursor = 'pointer';
-              button.setAttribute('data-igo-configured', 'true');
-              console.log(`🔧 Existing button ${index + 1} configured`);
+          try {
+            const result = await handleVditorUpload(files, note);
+            const parsed = JSON.parse(result);
+            
+            if (parsed && parsed.length > 0 && parsed[0].url) {
+              if (notePanelEditor) {
+                const current = notePanelEditor.getValue();
+                // URL zaten HTML img tag formatında olabilir
+                // Önce newline ekle (ses ile karışmaması için)
+                const newlinePrefix = current.trim().length > 0 && !current.endsWith('\n\n') ? '\n\n' : '';
+                const imageContent = newlinePrefix + parsed[0].url + '\n\n';
+                notePanelEditor.setValue(current + imageContent);
+                console.log('✅ Resim eklendi:', parsed[0].url);
+                
+                // Vditor'un resmi render etmesi için tetikle
+                setTimeout(() => {
+                  if (notePanelEditor && typeof notePanelEditor.vditor === 'object') {
+                    const wysiwyg = document.querySelector('#notePanelEditor .vditor-wysiwyg');
+                    if (wysiwyg) {
+                      // Force render
+                      const event = new Event('input', { bubbles: true });
+                      wysiwyg.dispatchEvent(event);
+                    }
+                  }
+                }, 100);
+              }
             }
-          });
-          
-          // Toolbar'ın pointer events'ini aktif et
-          existingToolbarElement.style.pointerEvents = 'auto';
+          } catch (error) {
+            console.error('❌ Resim yükleme hatası:', error);
+            if (window.showNotification) {
+              window.showNotification('Resim yükleme hatası: ' + error.message, 'error');
+            }
+          }
         }
+      };
+      
+      fileInput.click();
+      return false;
+    }, true);
+    
+    // Simgeyi güçlendir
+    if (!imageBtn.innerHTML || imageBtn.innerHTML.trim() === '' || !imageBtn.innerHTML.includes('🖼️')) {
+      imageBtn.innerHTML = '🖼️';
+    }
+    
+    console.log('✅ Manuel image butonu eklendi:', imageBtn.innerHTML);
+    return true;
+  } catch (error) {
+    console.error('❌ Manuel image butonu ekleme hatası:', error);
+    return false;
+  }
+}
+
+// Manuel ses kaydı butonu ekle
+function addManualAudioButton(toolbar) {
+  try {
+    // Link butonunu bul (referans olarak)
+    const linkBtn = toolbar.querySelector('[data-type="link"]');
+    if (!linkBtn) {
+      console.log('⚠️ Link butonu bulunamadı, ses kaydı butonu eklenemedi');
+      return false;
+    }
+    
+    // Yeni ses kaydı butonu oluştur
+    const audioBtn = document.createElement('button');
+    audioBtn.type = 'button';
+    audioBtn.innerHTML = '🎤';
+    audioBtn.className = linkBtn.className;
+    audioBtn.setAttribute('data-type', 'audio-record');
+    audioBtn.setAttribute('title', 'Ses Kaydı');
+    audioBtn.style.cssText = linkBtn.style.cssText;
+    audioBtn.style.marginLeft = '4px';
+    audioBtn.style.display = 'inline-block';
+    audioBtn.style.visibility = 'visible';
+    audioBtn.style.opacity = '1';
+    audioBtn.style.fontSize = '16px';
+    audioBtn.style.lineHeight = '1';
+    audioBtn.style.padding = '6px 8px';
+    audioBtn.style.minWidth = '32px';
+    audioBtn.style.textAlign = 'center';
+    
+    // Link butonundan sonra ekle
+    linkBtn.parentNode.insertBefore(audioBtn, linkBtn.nextSibling);
+    
+    // Event listener ekle
+    audioBtn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      console.log('🎤 Ses kaydı başlatılıyor...');
+      
+      const note = notePanelCurrentNoteId ? window.notes.find(n => n.id === notePanelCurrentNoteId) : null;
+      
+      if (!note || !note.id) {
+        if (window.showNotification) {
+          window.showNotification('Önce notu kaydedin!', 'error');
+        }
+        return false;
+      }
+      
+      showAudioRecordingModal(note);
+      return false;
+    }, true);
+    
+    // Simgeyi güçlendir
+    if (!audioBtn.innerHTML || audioBtn.innerHTML.trim() === '' || !audioBtn.innerHTML.includes('🎤')) {
+      audioBtn.innerHTML = '🎤';
+    }
+    
+    console.log('✅ Manuel ses kaydı butonu eklendi:', audioBtn.innerHTML);
+    return true;
+  } catch (error) {
+    console.error('❌ Manuel ses kaydı butonu ekleme hatası:', error);
+    return false;
+  }
+}
+
+// Custom image butonu ekle
+function setupCustomImageButton() {
+  try {
+    const toolbar = document.querySelector('#notePanelEditor .vditor-toolbar');
+    if (!toolbar) {
+      console.log('⚠️ Toolbar bulunamadı (image)');
+      return false;
+    }
+    
+    // Farklı selector'ları dene
+    let imageBtn = toolbar.querySelector('[data-type="image"]');
+    if (!imageBtn) {
+      // Title'a göre bul
+      const allButtons = toolbar.querySelectorAll('button');
+      imageBtn = Array.from(allButtons).find(btn => {
+        const title = btn.getAttribute('title') || '';
+        return title.toLowerCase().includes('image') || title.toLowerCase().includes('resim');
+      });
+    }
+    
+    if (!imageBtn) {
+      console.log('⚠️ Image butonu bulunamadı');
+      return false;
+    }
+    
+    // Vditor'un tüm event listener'larını kaldırmak için yeni buton oluştur
+    const newImageBtn = imageBtn.cloneNode(true);
+    
+    // Tüm mevcut event listener'ları temizle
+    const newImageBtnClean = document.createElement('button');
+    newImageBtnClean.type = 'button';
+    newImageBtnClean.className = newImageBtn.className;
+    newImageBtnClean.innerHTML = newImageBtn.innerHTML;
+    newImageBtnClean.setAttribute('data-type', 'image');
+    newImageBtnClean.setAttribute('title', newImageBtn.getAttribute('title') || 'Resim');
+    newImageBtnClean.style.cssText = newImageBtn.style.cssText;
+    
+    // Eski butonu yeni butonla değiştir
+    imageBtn.parentNode.replaceChild(newImageBtnClean, imageBtn);
+    
+    // Custom handler marker ekle
+    newImageBtnClean.setAttribute('data-custom-handler', 'true');
+    
+    // Yeni click event'i ekle - Dosya seçici aç
+    newImageBtnClean.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      console.log('🖼️ Custom image seçici açılıyor...');
+      
+      // Not bilgisini kontrol et
+      const note = notePanelCurrentNoteId ? window.notes.find(n => n.id === notePanelCurrentNoteId) : null;
+      
+      if (!note || !note.id) {
+        if (window.showNotification) {
+          window.showNotification('Önce notu kaydedin!', 'error');
+        }
+        return false;
+      }
+      
+      // Dosya seçici oluştur
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      fileInput.multiple = false;
+      
+      fileInput.onchange = async (event) => {
+        const files = event.target.files;
+        if (files && files.length > 0) {
+          console.log('📤 Resim seçildi:', files[0].name);
+          
+          // Vditor upload handler'ını kullan
+          try {
+            const result = await handleVditorUpload(files, note);
+            const parsed = JSON.parse(result);
+            
+            if (parsed && parsed.length > 0 && parsed[0].url) {
+              // Vditor'a markdown içeriğini ekle
+              if (notePanelEditor) {
+                const current = notePanelEditor.getValue();
+                // URL zaten HTML img tag formatında olabilir
+                // Önce newline ekle (ses ile karışmaması için)
+                const newlinePrefix = current.trim().length > 0 && !current.endsWith('\n\n') ? '\n\n' : '';
+                const imageContent = newlinePrefix + parsed[0].url + '\n\n';
+                notePanelEditor.setValue(current + imageContent);
+                console.log('✅ Resim eklendi:', parsed[0].url);
+                
+                // Vditor'un resmi render etmesi için tetikle
+                setTimeout(() => {
+                  if (notePanelEditor && typeof notePanelEditor.vditor === 'object') {
+                    const wysiwyg = document.querySelector('#notePanelEditor .vditor-wysiwyg');
+                    if (wysiwyg) {
+                      // Force render
+                      const event = new Event('input', { bubbles: true });
+                      wysiwyg.dispatchEvent(event);
+                    }
+                  }
+                }, 100);
+              }
+            }
+          } catch (error) {
+            console.error('❌ Resim yükleme hatası:', error);
+            if (window.showNotification) {
+              window.showNotification('Resim yükleme hatası: ' + error.message, 'error');
+            }
+          }
+        }
+      };
+      
+      fileInput.click();
+      
+      return false;
+    }, true);
+    
+    // Görünürlük stillerini ayarla
+    newImageBtnClean.style.display = 'inline-block';
+    newImageBtnClean.style.visibility = 'visible';
+    newImageBtnClean.style.fontSize = '16px';
+    newImageBtnClean.style.lineHeight = '1';
+    newImageBtnClean.style.minWidth = '32px';
+    newImageBtnClean.style.textAlign = 'center';
+    
+    // Simge boşsa emoji ekle
+    if (!newImageBtnClean.innerHTML || newImageBtnClean.innerHTML.trim() === '' || !newImageBtnClean.innerHTML.includes('🖼️')) {
+      if (!newImageBtnClean.querySelector('svg')) {
+        newImageBtnClean.innerHTML = '🖼️';
+      }
+    }
+    
+    // Image butonu için periyodik kontrol ekle
+    if (!window.imageButtonChecker) {
+      window.imageButtonChecker = setInterval(() => {
+        const btn = toolbar.querySelector('[data-type="image"][data-custom-handler="true"]');
+        if (btn) {
+          btn.style.display = 'inline-block';
+          btn.style.visibility = 'visible';
+          btn.style.fontSize = '16px';
+          // Simge boşsa emoji ekle
+          if (!btn.innerHTML || btn.innerHTML.trim() === '' || !btn.innerHTML.includes('🖼️')) {
+            if (!btn.querySelector('svg')) {
+              btn.innerHTML = '🖼️';
+            }
+          }
+        }
+      }, 1000);
+    }
+    
+    console.log('✅ Custom image butonu eklendi ve override edildi');
+    return true;
+  } catch (error) {
+    console.error('❌ Image butonu ekleme hatası:', error);
+    return false;
+  }
+}
+
+function openLinkInsertModal(selectedText = '') {
+  const modal = document.createElement('div');
+  modal.innerHTML = `
+    <div id="linkInsertModal" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10003;display:flex;align-items:center;justify-content:center">
+      <div style="background:var(--noteditor-panel);border:1px solid var(--noteditor-border);border-radius:12px;padding:20px;min-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+        <h3 style="margin:0 0 12px 0;color:var(--noteditor-text);font-size:16px;font-weight:600">🔗 Bağlantı Ekle</h3>
+        <label style="display:block;color:var(--noteditor-text);font-size:13px;margin-bottom:4px">Görünen Metin</label>
+        <input id="linkTextIn" value="${selectedText}" style="width:100%;margin-bottom:12px;padding:10px;background:rgba(255,255,255,.05);border:1px solid var(--noteditor-border);border-radius:6px;color:var(--noteditor-text);font-size:14px">
+        <label style="display:block;color:var(--noteditor-text);font-size:13px;margin-bottom:4px">URL</label>
+        <input id="linkHrefIn" placeholder="https://..." style="width:100%;margin-bottom:16px;padding:10px;background:rgba(255,255,255,.05);border:1px solid var(--noteditor-border);border-radius:6px;color:var(--noteditor-text);font-size:14px">
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="linkCancel" style="padding:8px 14px;background:rgba(255,255,255,.06);border:1px solid var(--noteditor-border);border-radius:6px;color:var(--noteditor-text);cursor:pointer">İptal</button>
+          <button id="linkOk" style="padding:8px 14px;background:linear-gradient(135deg,var(--noteditor-accent),var(--noteditor-accent2));border:none;border-radius:6px;color:#0a0d12;font-weight:600;cursor:pointer">Ekle</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  
+  const cancel = modal.querySelector('#linkCancel');
+  const ok = modal.querySelector('#linkOk');
+  const textIn = modal.querySelector('#linkTextIn');
+  const hrefIn = modal.querySelector('#linkHrefIn');
+  
+  const close = () => {
+    if (document.body.contains(modal)) {
+      document.body.removeChild(modal);
+    }
+  };
+  
+  cancel.onclick = close;
+  modal.addEventListener('click', (e) => { 
+    if (e.target.id === 'linkInsertModal') close(); 
+  });
+  
+  ok.onclick = () => {
+    const text = (textIn.value || '').trim();
+    const href = (hrefIn.value || '').trim();
+    
+    if (!href) {
+      hrefIn.focus();
+      hrefIn.style.borderColor = '#ef4444';
+      return;
+    }
+    
+    try {
+      const safeHref = href.match(/^https?:\/\//i) ? href : ('https://' + href);
+      const mdLink = text ? `[${text}](${safeHref})` : `<${safeHref}>`;
+      
+      // Vditor'a link ekle
+      if (notePanelEditor) {
+        const current = notePanelEditor.getValue();
+        const newContent = current + '\n' + mdLink + '\n';
+        notePanelEditor.setValue(newContent);
+      }
+      
+      close();
+    } catch (err) {
+      console.error('❌ Link ekleme hatası:', err);
+    }
+  };
+  
+  textIn.focus();
+  
+  hrefIn.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') ok.click();
+  });
+}
+
+// Vditor dosya yükleme handler'ı
+async function handleVditorUpload(files, note) {
+  if (!files || files.length === 0) {
+    console.error('❌ Dosya yok');
+    return Promise.resolve('[]');
+  }
+  
+  if (!note || !note.id) {
+    console.error('❌ Not bilgisi yok, önce notu kaydedin');
+    if (window.showNotification) {
+      window.showNotification('Önce notu kaydedin!', 'error');
+    }
+    return Promise.resolve('[]');
+  }
+  
+  // Electron kontrolü
+  if (typeof require === 'undefined') {
+    console.error('❌ Electron ortamı yok');
+    return Promise.resolve('[]');
+  }
+  
+  const { ipcRenderer } = require('electron');
+  
+  // Her dosya için yükleme işlemi
+  const uploadPromises = Array.from(files).map(file => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        const fileData = e.target.result;
+        const fileName = file.name;
+        const fileType = file.type;
+        
+        // Dosya türünü belirle
+        const isImage = fileType.startsWith('image/');
+        const isAudio = fileType.startsWith('audio/');
+        
+        if (!isImage && !isAudio) {
+          console.error('❌ Desteklenmeyen dosya türü:', fileType);
+          reject(new Error('Desteklenmeyen dosya türü'));
+          return;
+        }
+        
+        // Base64'ten buffer'a çevir
+        const base64Data = fileData.split(',')[1];
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        // IPC ile dosyayı kaydet
+        ipcRenderer.invoke('save-uploaded-file', {
+          noteId: note.id,
+          fileName: fileName,
+          fileData: buffer,
+          fileType: fileType,
+          isImage: isImage,
+          isAudio: isAudio
+        }).then(result => {
+          if (result.success) {
+            console.log('✅ Dosya kaydedildi:', result.filePath);
+            // Relative path'i döndür (Markdown için)
+            const relativePath = result.relativePath || result.fileName;
+            
+            if (isImage) {
+              // Resim için file:// URL ile Markdown formatı (Electron'da çalışır)
+              const fullPath = result.filePath;
+              let normalizedPath = fullPath.replace(/\\/g, '/');
+              let fileUrl;
+              if (normalizedPath.match(/^[A-Za-z]:\//)) {
+                // Windows absolute path
+                fileUrl = `file:///${normalizedPath}`;
+              } else {
+                // Unix path
+                fileUrl = `file://${normalizedPath}`;
+              }
+              
+              // Markdown formatı kullan (Vditor WYSIWYG render eder)
+              resolve(`![${fileName}](${fileUrl})`);
+            } else {
+              // Ses için full path'ten direkt HTML audio tag oluştur
+              const fullPath = result.filePath;
+              let normalizedPath = fullPath.replace(/\\/g, '/');
+              let fileUrl;
+              if (normalizedPath.match(/^[A-Za-z]:\//)) {
+                // Windows absolute path (C:/path/to/file)
+                fileUrl = `file:///${normalizedPath}`;
+              } else {
+                // Unix path
+                fileUrl = `file://${normalizedPath}`;
+              }
+              
+              // HTML audio tag'i oluştur (WYSIWYG editörde oynatılabilir)
+              resolve(`<audio controls><source src="${fileUrl}" type="${fileType}">Tarayıcınız ses oynatmayı desteklemiyor.</audio>`);
+            }
+          } else {
+            console.error('❌ Dosya kaydedilemedi:', result.error);
+            reject(new Error(result.error || 'Dosya kaydedilemedi'));
+          }
+        }).catch(error => {
+          console.error('❌ IPC hatası:', error);
+          reject(error);
+        });
+      };
+      
+      reader.onerror = () => {
+        reject(new Error('Dosya okunamadı'));
+      };
+      
+      reader.readAsDataURL(file);
+    });
+  });
+  
+  try {
+    const results = await Promise.all(uploadPromises);
+    // Vditor formatına uygun şekilde döndür (her bir sonuç zaten markdown link formatında)
+    // Vditor bekliyor: [{ url: "markdown content" }]
+    const formattedResults = results.map(markdownLink => ({ url: markdownLink }));
+    console.log('✅ Upload tamamlandı:', formattedResults);
+    return Promise.resolve(JSON.stringify(formattedResults));
+  } catch (error) {
+    console.error('❌ Upload hatası:', error);
+    if (window.showNotification) {
+      window.showNotification('Dosya yükleme hatası: ' + error.message, 'error');
+    }
+    return Promise.resolve('[]');
+  }
+}
+
+// Ses kaydı butonu ekle
+function setupAudioRecordingButton() {
+  try {
+    const toolbar = document.querySelector('#notePanelEditor .vditor-toolbar');
+    if (!toolbar) {
+      console.log('⚠️ Toolbar bulunamadı (audio)');
+      return false;
+    }
+    
+    // Vditor'un kendi upload butonunu tamamen kaldır (DOM'dan sil)
+    const vditorUploadBtns = toolbar.querySelectorAll('[data-type="upload"], button[title*="Upload" i], button[title*="upload" i], button[aria-label*="upload" i], button[aria-label*="Upload"]');
+    vditorUploadBtns.forEach(btn => {
+      // Önce tamamen gizle
+      btn.style.display = 'none';
+      btn.style.visibility = 'hidden';
+      btn.style.opacity = '0';
+      btn.style.width = '0';
+      btn.style.height = '0';
+      btn.style.padding = '0';
+      btn.style.margin = '0';
+      btn.style.position = 'absolute';
+      btn.style.left = '-9999px';
+      btn.setAttribute('data-hidden', 'true');
+      // DOM'dan tamamen kaldır
+      try {
+        if (btn.parentNode) {
+          btn.parentNode.removeChild(btn);
+        }
+      } catch (e) {
+        // Ignore remove errors
+      }
+      console.log('📤 Vditor upload butonu kaldırıldı:', btn.getAttribute('title') || btn.getAttribute('aria-label') || 'no title');
+    });
+    
+    // Sürekli kontrol için hızlı interval (100ms) - DOM'dan tamamen kaldır
+    if (!window.vditorUploadHiderLocal) {
+      window.vditorUploadHiderLocal = setInterval(() => {
+        const uploadBtns = toolbar.querySelectorAll('[data-type="upload"], button[title*="Upload" i], button[title*="upload" i], button[aria-label*="upload" i]');
+        uploadBtns.forEach(btn => {
+          if (!btn.hasAttribute('data-hidden')) {
+            btn.style.display = 'none';
+            btn.style.visibility = 'hidden';
+            btn.style.opacity = '0';
+            btn.style.position = 'absolute';
+            btn.style.left = '-9999px';
+            btn.setAttribute('data-hidden', 'true');
+            // DOM'dan tamamen kaldır
+            try {
+              if (btn.parentNode) {
+                btn.parentNode.removeChild(btn);
+              }
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+        });
       }, 100);
     }
     
-    // ESC tuşu ile kapatma
-    document.addEventListener('keydown', function escHandler(e) {
-      if (e.key === 'Escape' && notePanelOverlay.classList.contains('active')) {
-        closeNotePanel();
-        document.removeEventListener('keydown', escHandler);
-      }
-    });
+    // Mevcut ses kaydı butonunu kontrol et
+    let audioBtn = toolbar.querySelector('[data-type="audio-record"]');
     
-    // Ctrl+S ile kaydetme
-    document.addEventListener('keydown', function saveHandler(e) {
-      if (e.ctrlKey && e.key === 's' && notePanelOverlay.classList.contains('active')) {
+    if (!audioBtn) {
+      // Image butonundan veya link butonundan sonra yeni buton oluştur
+      let imageBtn = toolbar.querySelector('[data-type="image"][data-custom-handler="true"]');
+      if (!imageBtn) {
+        // Link butonunu bul
+        const linkBtn = toolbar.querySelector('[data-type="link"]');
+        if (linkBtn) {
+          // Link butonundan sonra ses kaydı butonunu ekle
+          imageBtn = linkBtn; // Referans olarak kullan
+        } else {
+          console.log('⚠️ Image veya link butonu bulunamadı, ses kaydı butonu eklenemedi');
+          return false;
+        }
+      }
+      
+      // Yeni buton oluştur
+      audioBtn = document.createElement('button');
+      audioBtn.type = 'button';
+      audioBtn.innerHTML = '🎤';
+      audioBtn.setAttribute('title', 'Ses Kaydı');
+      audioBtn.setAttribute('data-type', 'audio-record');
+      audioBtn.className = imageBtn.className; // Vditor stilini koru
+      audioBtn.style.cssText = imageBtn.style.cssText; // Tüm stilleri kopyala
+      audioBtn.style.marginLeft = '4px';
+      audioBtn.style.display = 'inline-block';
+      audioBtn.style.visibility = 'visible';
+      audioBtn.style.opacity = '1';
+      audioBtn.style.fontSize = '16px';
+      audioBtn.style.lineHeight = '1';
+      audioBtn.style.padding = '6px 8px';
+      audioBtn.style.minWidth = '32px';
+      audioBtn.style.textAlign = 'center';
+      
+      // Image butonundan sonra ekle
+      imageBtn.parentNode.insertBefore(audioBtn, imageBtn.nextSibling);
+      
+      // Event listener'ı ekle
+      audioBtn.addEventListener('click', async function(e) {
         e.preventDefault();
-        saveNotePanelNote();
-        document.removeEventListener('keydown', saveHandler);
-      }
-    });
-    
-  } else {
-    console.error('Not Paneli elementleri bulunamadı!');
-  }
-}
-
-function closeNotePanel() {
-  const notePanelOverlay = document.getElementById('notePanelOverlay');
-  const notePanelTitleInput = document.getElementById('notePanelTitleInput');
-  
-  if (notePanelOverlay) {
-    notePanelOverlay.classList.remove('active');
-    
-    // CKEditor varsa temizle
-    if (notePanelEditor) {
-      notePanelEditor.destroy();
-      notePanelEditor = null;
-    }
-    
-    // Input'ları temizle
-    if (notePanelTitleInput) {
-      notePanelTitleInput.value = '';
-    }
-    
-    notePanelCurrentNoteId = null;
-  }
-}
-
-function saveNotePanelNote() {
-  const notePanelTitleInput = document.getElementById('notePanelTitleInput');
-  
-  if (!notePanelTitleInput || !notePanelEditor) {
-    console.error('Not Paneli input elementleri bulunamadı!');
-    return;
-  }
-  
-  const title = notePanelTitleInput.value.trim();
-  let htmlContent = notePanelEditor.getData(); // Artık otomatik decode ediliyor
-  
-  // HTML'den Markdown'a dönüştür
-  let markdownContent = window.htmlToMarkdown ? window.htmlToMarkdown(htmlContent) : htmlContent;
-  
-  // Etiketleri ve bağlantıları dönüştür (HTML için)
-  htmlContent = htmlContent.replace(/#([a-z0-9ğüşiöçıİĞÜŞİÖÇ\-_]+)(?![^<]*>)/g, '<span class="tagtok">#$1</span>');
-  htmlContent = htmlContent.replace(/\[\[([^\]]+)\]\]/g, '<span class="wikilink" data-link="$1">[[$1]]</span>');
-  
-  // Markdown için de etiketleri ve bağlantıları dönüştür
-  markdownContent = markdownContent.replace(/#([a-z0-9ğüşiöçıİĞÜŞİÖÇ\-_]+)/g, '#$1');
-  markdownContent = markdownContent.replace(/\[\[([^\]]+)\]\]/g, '[[$1]]');
-  
-  // Boş içerik kontrolü - eğer başlık ve içerik boşsa not oluşturma
-  if (!title && !htmlContent.trim()) {
-    console.log('📝 Boş içerik, not oluşturulmuyor');
-    closeNotePanel();
-    return;
-  }
-  
-  // Başlık yoksa varsayılan başlık kullan
-  const finalTitle = title || 'Başlıksız Not';
-  
-  if (notePanelCurrentNoteId) {
-    // Mevcut notu güncelle ve dönen notu al
-    const updatedNote = window.updateNote ? window.updateNote(notePanelCurrentNoteId, finalTitle, htmlContent) : null;
-    
-    // Güncellenen notu dosyaya kaydet (markdown formatında)
-    if (updatedNote) {
-      updatedNote.isSaved = true;
-      updatedNote.markdownContent = markdownContent; // Markdown içeriği ekle
-      if (window.saveNoteToFile) window.saveNoteToFile(updatedNote);
-    }
-    
-    // Dinamik güncellemeler
-    if (window.renderTags) window.renderTags(); // Etiketler panelini güncelle
-    setTimeout(() => {
-      if (window.drawConnections) window.drawConnections(); // Bağlantı çizgilerini yeniden çiz
-    }, 100);
-  } else {
-    let note;
-    try {
-      // Yeni not oluştur
-      note = {
-        id: window.generateUniqueId ? window.generateUniqueId(finalTitle, 'note') : Date.now().toString(), // Benzersiz ID
-        title: finalTitle,
-        text: htmlContent,
-        markdownContent: markdownContent,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        tags: window.parseTags ? window.parseTags(htmlContent) : [],
-        links: window.parseWikilinks ? window.parseWikilinks(htmlContent) : [],
-        folderId: window.pendingNoteFolderId || null, // Klasör ID'sini kullan
-        x: Math.random() * 400 + 100,
-        y: Math.random() * 300 + 100,
-        width: 280,
-        height: 200,
-        isSaved: false,
-        fileName: null
-      };
-      
-      // Pending folder ID'sini temizle
-      if (window.pendingNoteFolderId) {
-        console.log('📁 Not klasöre bağlandı:', window.pendingNoteFolderId);
-        window.pendingNoteFolderId = null;
-      }
-      
-      window.notes.unshift(note);
-      if (window.saveNotes) window.saveNotes();
-      
-      // Anında UI güncelle - gecikme yok! (animasyonlu)
-      if (window.renderNotesImmediate) window.renderNotesImmediate(); // Debounce olmadan anında render
-      if (window.renderNoteList) window.renderNoteList();
-      if (window.renderTags) window.renderTags();
-      
-    } catch (error) {
-      // Hata mesajını göster
-      if (window.showNotification) window.showNotification(error.message, 'error');
-      console.log('❌ Not oluşturulamadı:', error.message);
-      return;
-    }
-    
-    // Yeni notu dosyaya kaydet (ilk kaydetme)
-    note.isSaved = true;
-    if (window.saveNoteToFile) window.saveNoteToFile(note);
-    
-    // Dinamik güncellemeler (animasyonsuz - zaten render edildi)
-    if (window.renderTags) window.renderTags(); // Etiketler panelini güncelle
-    if (window.renderFolderList) window.renderFolderList();
-    if (window.selectNote) window.selectNote(note.id);
-    
-    // Bağlantı çizgilerini de anında güncelle
-    setTimeout(() => {
-      if (window.drawConnections) window.drawConnections(); // Bağlantı çizgilerini yeniden çiz
-    }, 50); // Çok kısa gecikme
-  }
-  
-  closeNotePanel();
-}
-
-function updateNotePanelStats(content) {
-  const notePanelWordCount = document.getElementById('notePanelWordCount');
-  const notePanelCharCount = document.getElementById('notePanelCharCount');
-  
-  if (notePanelWordCount && notePanelCharCount) {
-    // HTML içeriğini temizle ve metin olarak al
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = content;
-    const textContent = tempDiv.textContent || tempDiv.innerText || '';
-    
-    const words = textContent.trim().split(/\s+/).filter(word => word.length > 0);
-    const characters = textContent.length;
-    
-    notePanelWordCount.textContent = `${words.length} kelime`;
-    notePanelCharCount.textContent = `${characters} karakter`;
-  }
-}
-
-// ===== CKEditor Helper Functions =====
-
-function addHRButton(editor, toolbarElement) {
-  // Çizgi butonu oluştur - CKEditor tarzında
-  const hrButton = document.createElement('button');
-  hrButton.className = 'ck ck-button';
-  hrButton.innerHTML = '<svg viewBox="0 0 20 20" width="16" height="16"><path d="M2 10h16" stroke="white" stroke-width="2" fill="none"/></svg>';
-  hrButton.title = 'Yatay çizgi ekle';
-  hrButton.style.cssText = `
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--text);
-    padding: 4px;
-    cursor: pointer;
-    margin: 0 1px;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 28px;
-    height: 28px;
-    border-radius: 4px;
-    pointer-events: auto;
-    webkit-app-region: no-drag;
-  `;
-  
-  // Hover efekti - CKEditor tarzında
-  hrButton.addEventListener('mouseenter', () => {
-    hrButton.style.backgroundColor = 'rgba(255,255,255,.06)';
-    hrButton.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-    hrButton.style.color = 'var(--text)';
-  });
-  hrButton.addEventListener('mouseleave', () => {
-    hrButton.style.backgroundColor = 'transparent';
-    hrButton.style.borderColor = 'transparent';
-    hrButton.style.color = 'var(--text)';
-  });
-  
-  // Tıklama olayı
-  hrButton.addEventListener('click', (e) => {
-    e.stopPropagation();
-    
-    // CKEditor'ın model'ine doğrudan hr elementi ekle
-    editor.model.change(writer => {
-      const hrElement = writer.createElement('hr');
-      
-      // Mevcut seçimi al
-      const selection = editor.model.document.selection;
-      const insertPosition = selection.getFirstPosition();
-      
-      // HR elementini ekle
-      writer.insert(hrElement, insertPosition);
-      
-      // Cursor'u HR'den sonraya taşı ve yeni paragraf oluştur
-      const positionAfterHr = writer.createPositionAfter(hrElement);
-      const newParagraph = writer.createElement('paragraph');
-      writer.insert(newParagraph, positionAfterHr);
-      
-      // Cursor'u yeni paragrafın başına taşı ve formatı temizle
-      const newPosition = writer.createPositionAt(newParagraph, 0);
-      writer.setSelection(newPosition);
-      
-      // Başlık formatını temizle (eğer varsa) - sadece HR ekleme sırasında
-      const headingCommand = editor.commands.get('heading');
-      if (headingCommand && headingCommand.value) {
-        try {
-          headingCommand.execute();
-        } catch (error) {
-          const paragraphCommand = editor.commands.get('paragraph');
-          if (paragraphCommand) {
-            paragraphCommand.execute();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        console.log('🎤 Ses kaydı başlatılıyor...');
+        
+        // Not bilgisini al
+        const note = notePanelCurrentNoteId ? window.notes.find(n => n.id === notePanelCurrentNoteId) : null;
+        
+        if (!note || !note.id) {
+          if (window.showNotification) {
+            window.showNotification('Önce notu kaydedin!', 'error');
           }
-        }
-      }
-    });
-  });
-  
-  // Toolbar'daki butonlar arasına ekle - Link butonundan sonra
-  const toolbarButtonsList = toolbarElement.querySelectorAll('.ck-button');
-  let insertAfterButton = null;
-  
-  // Link butonunu bul
-  for (let i = 0; i < toolbarButtonsList.length; i++) {
-    const button = toolbarButtonsList[i];
-    if (button.getAttribute('data-cke-tooltip-text') && 
-        button.getAttribute('data-cke-tooltip-text').includes('Link')) {
-      insertAfterButton = button;
-      break;
-    }
-  }
-  
-  // Çizgi butonunu ekle
-  if (insertAfterButton) {
-    // Link butonundan sonra ekle
-    insertAfterButton.insertAdjacentElement('afterend', hrButton);
-  } else {
-    // Link butonu bulunamazsa sona ekle
-    toolbarElement.appendChild(hrButton);
-  }
-  
-  console.log('✅ Özel çizgi butonu toolbar\'a eklendi');
-}
-
-function setupCKEditorEvents(editor, editableElement) {
-  // CKEditor click event'i ekle
-  editableElement.addEventListener('click', () => {
-    console.log('🖱️ CKEditor clicked');
-    editor.editing.view.focus();
-  });
-  
-  // CKEditor keydown event'i ekle
-  editableElement.addEventListener('keydown', (e) => {
-    console.log('⌨️ CKEditor keydown:', e.key);
-    
-    // Ctrl+Shift+H ile çizgi ekleme
-    if (e.ctrlKey && e.shiftKey && e.key === 'H') {
-      e.preventDefault();
-      
-      // CKEditor'ın model'ine doğrudan hr elementi ekle
-      editor.model.change(writer => {
-        const hrElement = writer.createElement('hr');
-        
-        // Mevcut seçimi al
-        const selection = editor.model.document.selection;
-        const insertPosition = selection.getFirstPosition();
-        
-        // HR elementini ekle
-        writer.insert(hrElement, insertPosition);
-        
-        // Cursor'u HR'den sonraya taşı ve yeni paragraf oluştur
-        const positionAfterHr = writer.createPositionAfter(hrElement);
-        const newParagraph = writer.createElement('paragraph');
-        writer.insert(newParagraph, positionAfterHr);
-        
-        // Cursor'u yeni paragrafın başına taşı ve formatı temizle
-        const newPosition = writer.createPositionAt(newParagraph, 0);
-        writer.setSelection(newPosition);
-        
-        // Başlık formatını temizle (eğer varsa)
-        const headingCommand = editor.commands.get('heading');
-        if (headingCommand && headingCommand.value) {
-          try {
-            headingCommand.execute();
-          } catch (error) {
-            const paragraphCommand = editor.commands.get('paragraph');
-            if (paragraphCommand) {
-              paragraphCommand.execute();
-            }
-          }
-        }
-      });
-    }
-    
-    // Üç tire ile çizgi ekleme (Enter'dan sonra)
-    if (e.key === 'Enter') {
-      const currentContent = editor.getData();
-      if (currentContent.includes('<p>---</p>') || currentContent.includes('<p>***</p>')) {
-        e.preventDefault();
-        
-        // CKEditor'ın model'ine doğrudan hr elementi ekle
-        editor.model.change(writer => {
-          const hrElement = writer.createElement('hr');
-          
-          // Mevcut seçimi al
-          const selection = editor.model.document.selection;
-          const insertPosition = selection.getFirstPosition();
-          
-          // HR elementini ekle
-          writer.insert(hrElement, insertPosition);
-          
-          // Cursor'u HR'den sonraya taşı ve yeni paragraf oluştur
-          const positionAfterHr = writer.createPositionAfter(hrElement);
-          const newParagraph = writer.createElement('paragraph');
-          writer.insert(newParagraph, positionAfterHr);
-          
-          // Cursor'u yeni paragrafın başına taşı ve formatı temizle
-          const newPosition = writer.createPositionAt(newParagraph, 0);
-          writer.setSelection(newPosition);
-          
-          // Başlık formatını temizle (eğer varsa)
-          const headingCommand = editor.commands.get('heading');
-          if (headingCommand && headingCommand.value) {
-            try {
-              headingCommand.execute();
-            } catch (error) {
-              const paragraphCommand = editor.commands.get('paragraph');
-              if (paragraphCommand) {
-                paragraphCommand.execute();
-              }
-            }
-          }
-        });
-      }
-    }
-  });
-  
-  // CKEditor input event'i ekle
-  editableElement.addEventListener('input', (e) => {
-    console.log('📝 CKEditor input event:', e);
-    console.log('📝 CKEditor content:', editableElement.innerHTML);
-  });
-  
-  // CKEditor text yazma event'i
-  editor.model.document.on('change:data', () => {
-    console.log('📝 CKEditor content changed');
-    console.log('📝 CKEditor HTML:', editor.getData());
-  });
-}
-
-function setupBlockquoteSystem(editor) {
-  // Blockquote'dan sonra ve içindeki boş paragrafları temizle
-  editor.model.document.on('change:data', () => {
-    setTimeout(() => {
-      const editableElement = editor.ui.getEditableElement();
-      if (!editableElement) return;
-      
-      // Blockquote'dan sonraki ve içindeki boş paragrafları temizle
-      const blockquotes = editableElement.querySelectorAll('blockquote');
-      blockquotes.forEach(blockquote => {
-        // Blockquote'dan sonraki boş paragrafları temizle
-        const nextSibling = blockquote.nextElementSibling;
-        if (nextSibling && nextSibling.tagName === 'P') {
-          if (nextSibling.innerHTML === '<br>' || 
-              nextSibling.textContent.trim() === '' ||
-              nextSibling.innerHTML === '') {
-            nextSibling.remove();
-          }
+          return false;
         }
         
-        // Blockquote içindeki boş paragrafları temizle
-        const paragraphs = blockquote.querySelectorAll('p');
-        paragraphs.forEach(p => {
-          if (p.innerHTML === '<br>' || 
-              p.textContent.trim() === '' ||
-              p.innerHTML === '' ||
-              (p.children.length === 1 && p.children[0].tagName === 'BR' && p.textContent.trim() === '') ||
-              p.innerHTML.trim() === '<br>' ||
-              p.innerHTML.trim() === '<br/>') {
-            p.remove();
-          }
-        });
+        // Ses kaydı modalını aç
+        showAudioRecordingModal(note);
         
-        // Eğer blockquote tamamen boşsa, içine en az bir paragraf ekle
-        if (blockquote.children.length === 0) {
-          const emptyP = document.createElement('p');
-          emptyP.innerHTML = '<br>';
-          blockquote.appendChild(emptyP);
-        }
-      });
-    }, 30);
-  });
-  
-  // Blockquote sistemi - İlk Enter yeni satır, ikinci Enter çıkış
-  editor.keystrokes.set('Enter', (evt, cancel) => {
-    const selection = editor.model.document.selection;
-    const position = selection.getFirstPosition();
-    
-    // Blockquote içinde mi kontrol et
-    let blockQuoteParent = position.parent;
-    while (blockQuoteParent && blockQuoteParent.name !== 'blockQuote') {
-      blockQuoteParent = blockQuoteParent.parent;
+        return false;
+      }, true);
+      
+      console.log('✅ Ses kaydı butonu eklendi');
+    } else {
+      // Mevcut butonun görünür olduğundan emin ol
+      audioBtn.style.display = 'inline-block';
+      audioBtn.style.visibility = 'visible';
+      audioBtn.style.opacity = '1';
+      console.log('✅ Ses kaydı butonu zaten var, görünürlük ayarlandı');
     }
     
-    if (blockQuoteParent && blockQuoteParent.name === 'blockQuote') {
-      const currentParagraph = position.parent;
-      
-      // Eğer blockquote'un son paragrafındaysa ve boşsa
-      if (currentParagraph.name === 'paragraph' && 
-          currentParagraph.nextSibling === null && 
-          currentParagraph.isEmpty) {
-        
-        cancel();
-        
-        // Blockquote'dan çık ve yeni paragraf oluştur
-        editor.model.change(writer => {
-          const newParagraph = writer.createElement('paragraph');
-          writer.insert(newParagraph, blockQuoteParent, 'after');
-          writer.setSelection(newParagraph, 0);
-        });
-        
-        // DOM'u temizle
+    // Toolbar değişikliklerini izle (Vditor yeniden render ederse tekrar ekle)
+    // Önceki observer'ı temizle
+    if (audioButtonObserver) {
+      audioButtonObserver.disconnect();
+    }
+    
+    audioButtonObserver = new MutationObserver((mutations) => {
+      const existingBtn = toolbar.querySelector('[data-type="audio-record"]');
+      if (existingBtn) {
+        // Buton var, görünürlüğünü kontrol et ve düzelt
+        if (existingBtn.style.display === 'none' || existingBtn.innerHTML !== '🎤') {
+          existingBtn.style.display = 'inline-block';
+          existingBtn.style.visibility = 'visible';
+          existingBtn.style.opacity = '1';
+          existingBtn.style.fontSize = '16px';
+          existingBtn.innerHTML = '🎤';
+        }
+      } else {
+        // Buton yok, tekrar ekle
+        // Önce observer'ı durdur (recursive çağrıyı önle)
+        audioButtonObserver.disconnect();
         setTimeout(() => {
-          const editableElement = editor.ui.getEditableElement();
-          if (editableElement) {
-            const blockquotes = editableElement.querySelectorAll('blockquote');
-            blockquotes.forEach(blockquote => {
-              // Blockquote'dan sonraki boş paragrafları temizle
-              const nextSibling = blockquote.nextElementSibling;
-              if (nextSibling && nextSibling.tagName === 'P' && 
-                  (nextSibling.innerHTML === '<br>' || nextSibling.textContent.trim() === '')) {
-                nextSibling.remove();
-              }
-              
-              // Blockquote içindeki boş paragrafları temizle
-              const paragraphs = blockquote.querySelectorAll('p');
-              paragraphs.forEach(p => {
-                if (p.innerHTML === '<br>' || 
-                    p.textContent.trim() === '' ||
-                    p.innerHTML === '' ||
-                    (p.children.length === 1 && p.children[0].tagName === 'BR' && p.textContent.trim() === '')) {
-                  p.remove();
-                }
-              });
-            });
+          setupAudioRecordingButton();
+        }, 200);
+      }
+      
+      // Vditor upload butonlarını sürekli kontrol et ve gizle
+      const uploadBtns = toolbar.querySelectorAll('[data-type="upload"], button[title*="Upload"], button[title*="upload"]');
+      uploadBtns.forEach(btn => {
+        if (btn.style.display !== 'none') {
+          btn.style.display = 'none';
+          btn.style.visibility = 'hidden';
+          btn.style.opacity = '0';
+        }
+      });
+    });
+    
+    audioButtonObserver.observe(toolbar, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'data-type', 'innerHTML']
+    });
+    
+    // Periyodik kontrol ekle (backup)
+    if (!window.audioButtonChecker) {
+      window.audioButtonChecker = setInterval(() => {
+        const btn = toolbar.querySelector('[data-type="audio-record"]');
+        if (btn) {
+          btn.style.display = 'inline-block';
+          btn.style.visibility = 'visible';
+          btn.style.fontSize = '16px';
+          if (btn.innerHTML !== '🎤') {
+            btn.innerHTML = '🎤';
           }
-        }, 10);
-        
-        return;
-      }
-      
-      // Eğer blockquote'un son paragrafındaysa ama içerik varsa
-      if (currentParagraph.name === 'paragraph' && 
-          currentParagraph.nextSibling === null && 
-          !currentParagraph.isEmpty) {
-        
-        // İçerik varsa normal Enter davranışına izin ver (yeni satır)
-        return;
-      }
-    }
-  });
-  
-  // Shift+Enter ile blockquote'dan çıkma
-  editor.keystrokes.set('Shift+Enter', (evt, cancel) => {
-    const selection = editor.model.document.selection;
-    const position = selection.getFirstPosition();
-    
-    // Blockquote içinde mi kontrol et
-    let blockQuoteParent = position.parent;
-    while (blockQuoteParent && blockQuoteParent.name !== 'blockQuote') {
-      blockQuoteParent = blockQuoteParent.parent;
-    }
-    
-    if (blockQuoteParent && blockQuoteParent.name === 'blockQuote') {
-      cancel();
-      
-      // Blockquote'dan çık ve yeni paragraf oluştur
-      editor.model.change(writer => {
-        const newParagraph = writer.createElement('paragraph');
-        writer.insert(newParagraph, blockQuoteParent, 'after');
-        writer.setSelection(newParagraph, 0);
-      });
-      
-      // DOM'u temizle
-      setTimeout(() => {
-        const editableElement = editor.ui.getEditableElement();
-        if (editableElement) {
-          const blockquotes = editableElement.querySelectorAll('blockquote');
-          blockquotes.forEach(blockquote => {
-            // Blockquote'dan sonraki boş paragrafları temizle
-            const nextSibling = blockquote.nextElementSibling;
-            if (nextSibling && nextSibling.tagName === 'P' && 
-                (nextSibling.innerHTML === '<br>' || nextSibling.textContent.trim() === '')) {
-              nextSibling.remove();
-            }
-            
-            // Blockquote içindeki boş paragrafları temizle
-            const paragraphs = blockquote.querySelectorAll('p');
-            paragraphs.forEach(p => {
-              if (p.innerHTML === '<br>' || 
-                  p.textContent.trim() === '' ||
-                  p.innerHTML === '' ||
-                  (p.children.length === 1 && p.children[0].tagName === 'BR' && p.textContent.trim() === '')) {
-                p.remove();
-              }
-            });
-          });
         }
-      }, 10);
-    }
-  });
-}
-
-function setupAutocomplete(editor) {
-  // Autocomplete state - local to this function
-  let autocompleteElement = null;
-  let selectedAutocompleteIndex = -1;
-  let tagAutocompleteElement = null;
-  let tagSelectedIndex = -1;
-  
-  const notePanelTitleInput = document.getElementById('notePanelTitleInput');
-  
-  // Başlık değişikliklerini dinle - sadece bu not için
-  const titleInputHandler = () => {
-    // Sadece aktif not için güncelle
-    if (window.updateNoteTitle) window.updateNoteTitle(notePanelCurrentNoteId, notePanelTitleInput.value);
-  };
-  notePanelTitleInput.addEventListener('input', titleInputHandler);
-  
-  // Handler'ı global olarak sakla (temizleme için)
-  window.currentTitleInputHandler = titleInputHandler;
-  
-  // Editor içerik değişikliklerini dinle
-  editor.model.document.on('change:data', () => {
-    const content = editor.getData();
-    updateNotePanelStats(content);
-    
-    // Wikilink autocomplete için kontrol
-    const lastOpenBracket = content.lastIndexOf('[[');
-    const textAfterBracket = content.substring(lastOpenBracket + 2);
-    
-    if (lastOpenBracket !== -1 && !textAfterBracket.includes(']]')) {
-      // HTML taglarını temizle ve sadece metni al
-      let query = textAfterBracket
-        .replace(/<[^>]*>/g, '') // HTML taglarını kaldır
-        .replace(/&nbsp;/g, ' ') // &nbsp; karakterlerini boşluk yap
-        .replace(/<br\s*\/?>/gi, ' ') // <br> taglarını boşluk yap
-        .trim();
-      
-      // Etiket (#) ile başlıyorsa temizle
-      if (query.startsWith('#')) {
-        query = '';
-      }
-      
-      // Eğer query boşsa ama [[ varsa, tüm notları göster
-      if (query.length === 0 && textAfterBracket.includes('</p>')) {
-        query = ''; // Boş query ile tüm notları göster
-      }
-      
-      showWikilinkAutocomplete(query);
-    } else {
-      hideWikilinkAutocomplete();
+      }, 1000);
     }
     
-    // Etiket autocomplete kontrolü - sadece satır başında
-    const lastHash = content.lastIndexOf('#');
-    const textAfterHash = content.substring(lastHash + 1);
-    
-    console.log('🏷️ Etiket kontrolü - lastHash:', lastHash, 'textAfterHash:', textAfterHash);
-    
-    // Sadece satır başında # varsa etiket autocomplete'i göster
-    if (lastHash !== -1 && textAfterHash === '</p>') {
-      // HTML tag'lerini temizle ve sadece metni al
-      let tagQuery = textAfterHash
-        .replace(/<[^>]*>/g, '') // HTML tag'lerini kaldır
-        .replace(/&nbsp;/g, ' ') // &nbsp; karakterlerini boşluk yap
-        .replace(/<br\s*\/?>/gi, ' ') // <br> tag'lerini boşluk yap
-        .trim();
-      
-      console.log('🏷️ Raw textAfterHash:', textAfterHash);
-      console.log('🏷️ Cleaned tagQuery:', tagQuery);
-      
-      // Eğer query boşsa ama # varsa, tüm etiketleri göster
-      if (tagQuery.length === 0) {
-        tagQuery = ''; // Boş query ile tüm etiketleri göster
-        console.log('🏷️ Boş query, tüm etiketler gösterilecek');
-      }
-      
-      showTagAutocomplete(tagQuery);
-    } else {
-      console.log('🏷️ Etiket autocomplete gizleniyor - satır başında değil');
-      hideTagAutocomplete();
-    }
-  });
-  
-  // Wikilink autocomplete fonksiyonları
-  function showWikilinkAutocomplete(query) {
-    // Önceki autocomplete'i temizle
-    if (autocompleteElement) {
-      autocompleteElement.remove();
-    }
-    
-    // Mevcut notları filtrele (mevcut notu hariç tut)
-    const currentNoteId = notePanelCurrentNoteId;
-    const matchingNotes = query.length === 0 
-      ? window.notes.filter(note => note.id !== currentNoteId)
-      : window.notes.filter(note => 
-        note.title.toLowerCase().includes(query.toLowerCase()) && 
-        note.id !== currentNoteId
-      );
-    
-    console.log('📝 Eşleşen notlar:', matchingNotes.length, matchingNotes.map(n => n.title));
-    
-    if (matchingNotes.length === 0) return;
-    
-    // Autocomplete elementi oluştur
-    autocompleteElement = document.createElement('div');
-    autocompleteElement.className = 'wikilink-autocomplete';
-    autocompleteElement.style.cssText = `
-      position: fixed;
-      background: #2d2d2d;
-      border: 2px solid #007acc;
-      border-radius: 8px;
-      padding: 8px;
-      max-height: 200px;
-      overflow-y: auto;
-      z-index: 999999;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      color: #ffffff;
-    `;
-    
-    // Notları listele
-    matchingNotes.slice(0, 8).forEach((note, index) => {
-      const item = document.createElement('div');
-      item.className = 'wikilink-autocomplete-item';
-      if (index === 0) item.classList.add('selected');
-      
-      item.style.cssText = `
-        padding: 8px;
-        cursor: pointer;
-        border-radius: 4px;
-        margin-bottom: 2px;
-        transition: background 0.2s;
-        color: #000000;
-        background: ${index === 0 ? '#007acc' : 'transparent'};
-        color: ${index === 0 ? '#ffffff' : '#000000'};
-      `;
-      
-      item.innerHTML = `
-        <div style="font-weight: 500; color: #ffffff;">${note.title}</div>
-      `;
-      
-      item.addEventListener('click', () => {
-        selectWikilinkSuggestion(note.title, query);
-      });
-      
-      item.addEventListener('mouseenter', () => {
-        // Diğer item'ları temizle
-        autocompleteElement.querySelectorAll('.wikilink-autocomplete-item').forEach(el => {
-          el.classList.remove('selected');
-          el.style.background = 'transparent';
-          el.style.color = '#ffffff';
-        });
-        
-        // Bu item'ı seçili yap
-        item.classList.add('selected');
-        item.style.background = '#007acc';
-        item.style.color = '#ffffff';
-        selectedAutocompleteIndex = index;
-      });
-      
-      item.addEventListener('mouseleave', () => {
-        if (!item.classList.contains('selected')) {
-          item.style.background = 'transparent';
-        }
-      });
-      
-      autocompleteElement.appendChild(item);
-    });
-    
-    selectedAutocompleteIndex = 0;
-    
-    // Body'ye ekle ve fixed pozisyon kullan
-    document.body.appendChild(autocompleteElement);
-    
-    // Ekranın ortasında göster
-    autocompleteElement.style.position = 'fixed';
-    autocompleteElement.style.top = '50%';
-    autocompleteElement.style.left = '50%';
-    autocompleteElement.style.transform = 'translate(-50%, -50%)';
-    autocompleteElement.style.width = '400px';
-    autocompleteElement.style.maxHeight = '300px';
-    autocompleteElement.style.zIndex = '999999';
-    autocompleteElement.style.backgroundColor = '#2d2d2d';
-    autocompleteElement.style.border = '3px solid #007acc';
-    autocompleteElement.style.borderRadius = '12px';
-    autocompleteElement.style.boxShadow = '0 8px 24px rgba(0,0,0,0.6)';
-    autocompleteElement.style.display = 'block';
-    autocompleteElement.style.visibility = 'visible';
-    autocompleteElement.style.opacity = '1';
-    
-    console.log('🎨 Autocomplete elementi oluşturuldu ve DOM\'a eklendi');
-  }
-  
-  function showTagAutocomplete(query) {
-    console.log('🏷️ Tag autocomplete tetiklendi, query:', query);
-    
-    // Önceki autocomplete'i temizle
-    if (tagAutocompleteElement) {
-      tagAutocompleteElement.remove();
-    }
-    
-    // Tüm notlardan etiketleri topla
-    const allTags = new Set();
-    window.notes.forEach(note => {
-      if (note.tags && Array.isArray(note.tags)) {
-        note.tags.forEach(tag => allTags.add(tag));
-      }
-    });
-    
-    // Query ile eşleşen etiketleri filtrele
-    const matchingTags = query.length === 0 
-      ? Array.from(allTags)
-      : Array.from(allTags).filter(tag => 
-        tag.toLowerCase().includes(query.toLowerCase())
-      );
-    
-    console.log('🏷️ Eşleşen etiketler:', matchingTags.length, matchingTags);
-    
-    if (matchingTags.length === 0) return;
-    
-    // Autocomplete elementi oluştur
-    tagAutocompleteElement = document.createElement('div');
-    tagAutocompleteElement.className = 'tag-autocomplete';
-    tagAutocompleteElement.style.cssText = `
-      position: fixed;
-      background: #2d2d2d;
-      border: 2px solid #007acc;
-      border-radius: 8px;
-      padding: 8px;
-      max-height: 200px;
-      overflow-y: auto;
-      z-index: 999999;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      color: #ffffff;
-    `;
-    
-    // Etiketleri listele
-    matchingTags.slice(0, 8).forEach((tag, index) => {
-      const item = document.createElement('div');
-      item.className = 'tag-autocomplete-item';
-      if (index === 0) item.classList.add('selected');
-      
-      item.style.cssText = `
-        padding: 8px;
-        cursor: pointer;
-        border-radius: 4px;
-        margin-bottom: 2px;
-        transition: background 0.2s;
-        color: #ffffff;
-        background: ${index === 0 ? '#007acc' : 'transparent'};
-      `;
-      
-      item.innerHTML = `
-        <div style="font-weight: 500; color: #ffffff;">#${tag}</div>
-      `;
-      
-      item.addEventListener('click', () => {
-        selectTagSuggestion(tag);
-      });
-      
-      item.addEventListener('mouseenter', () => {
-        // Diğer item'ları temizle
-        tagAutocompleteElement.querySelectorAll('.tag-autocomplete-item').forEach(el => {
-          el.classList.remove('selected');
-          el.style.background = 'transparent';
-          el.style.color = '#ffffff';
-        });
-        
-        // Bu item'ı seçili yap
-        item.classList.add('selected');
-        item.style.background = '#007acc';
-        item.style.color = '#ffffff';
-        tagSelectedIndex = index;
-      });
-      
-      item.addEventListener('mouseleave', () => {
-        if (!item.classList.contains('selected')) {
-          item.style.background = 'transparent';
-        }
-      });
-      
-      tagAutocompleteElement.appendChild(item);
-    });
-    
-    tagSelectedIndex = 0;
-    
-    // Body'ye ekle ve fixed pozisyon kullan
-    document.body.appendChild(tagAutocompleteElement);
-    
-    // Ekranın ortasında göster
-    tagAutocompleteElement.style.position = 'fixed';
-    tagAutocompleteElement.style.top = '50%';
-    tagAutocompleteElement.style.left = '50%';
-    tagAutocompleteElement.style.transform = 'translate(-50%, -50%)';
-    tagAutocompleteElement.style.width = '400px';
-    tagAutocompleteElement.style.maxHeight = '300px';
-    tagAutocompleteElement.style.zIndex = '999999';
-    tagAutocompleteElement.style.backgroundColor = '#2d2d2d';
-    tagAutocompleteElement.style.border = '3px solid #007acc';
-    tagAutocompleteElement.style.borderRadius = '12px';
-    tagAutocompleteElement.style.boxShadow = '0 8px 24px rgba(0,0,0,0.6)';
-    tagAutocompleteElement.style.display = 'block';
-    tagAutocompleteElement.style.visibility = 'visible';
-    tagAutocompleteElement.style.opacity = '1';
-    
-    console.log('🎨 Tag autocomplete elementi oluşturuldu ve DOM\'a eklendi');
-  }
-  
-  function selectTagSuggestion(tag) {
-    console.log('🏷️ Tag seçildi:', tag);
-    
-    const cleanTag = tag.trim();
-    const currentContent = editor.getData();
-    
-    const hashIndex = currentContent.lastIndexOf('#');
-    if (hashIndex !== -1) {
-      const beforeHash = currentContent.substring(0, hashIndex + 1);
-      const newContent = beforeHash + cleanTag;
-      console.log('🔄 Yeni içerik:', newContent);
-      
-      const cursorPosition = beforeHash.length + cleanTag.length;
-      editor.setData(newContent);
-      
-      setTimeout(() => {
-        const model = editor.model;
-        model.change(writer => {
-          const root = model.document.getRoot();
-          const maxOffset = root.maxOffset || 0;
-          const safePosition = Math.min(cursorPosition, maxOffset);
-          const endPosition = model.createPositionAt(root, safePosition);
-          writer.setSelection(endPosition);
-        });
-      }, 10);
-    }
-    
-    hideTagAutocomplete();
-  }
-  
-  function hideTagAutocomplete() {
-    if (tagAutocompleteElement) {
-      tagAutocompleteElement.remove();
-      tagAutocompleteElement = null;
-      tagSelectedIndex = -1;
-    }
-  }
-  
-  function hideWikilinkAutocomplete() {
-    if (autocompleteElement) {
-      autocompleteElement.remove();
-      autocompleteElement = null;
-      selectedAutocompleteIndex = -1;
-    }
-  }
-  
-  function selectWikilinkSuggestion(noteTitle, query) {
-    const currentContent = editor.getData();
-    const bracketIndex = currentContent.lastIndexOf('[[');
-    
-    if (bracketIndex !== -1) {
-      const beforeBracket = currentContent.substring(0, bracketIndex + 2);
-      const newContent = beforeBracket + noteTitle + ']]';
-      console.log('🔄 Yeni içerik:', newContent);
-      
-      const cursorPosition = beforeBracket.length + noteTitle.length + 2;
-      editor.setData(newContent);
-      
-      setTimeout(() => {
-        const model = editor.model;
-        model.change(writer => {
-          const root = model.document.getRoot();
-          const maxOffset = root.maxOffset || 0;
-          const safePosition = Math.min(cursorPosition, maxOffset);
-          const endPosition = model.createPositionAt(root, safePosition);
-          writer.setSelection(endPosition);
-        });
-      }, 10);
-    }
-    
-    hideWikilinkAutocomplete();
-  }
-  
-  function navigateTagAutocomplete(direction) {
-    console.log('🏷️ Tag navigation:', direction, 'current index:', tagSelectedIndex);
-    if (!tagAutocompleteElement || tagSelectedIndex === -1) {
-      console.log('🏷️ Tag autocomplete element yok veya index -1');
-      return;
-    }
-    
-    const items = tagAutocompleteElement.querySelectorAll('.tag-autocomplete-item');
-    console.log('🏷️ Tag items found:', items.length);
-    if (items.length === 0) return;
-    
-    // Önceki seçimi temizle
-    items[tagSelectedIndex]?.classList.remove('selected');
-    items[tagSelectedIndex].style.background = 'transparent';
-    items[tagSelectedIndex].style.color = '#ffffff';
-    
-    if (direction === 'down') {
-      tagSelectedIndex = (tagSelectedIndex + 1) % items.length;
-    } else if (direction === 'up') {
-      tagSelectedIndex = tagSelectedIndex <= 0 ? items.length - 1 : tagSelectedIndex - 1;
-    }
-    
-    console.log('🏷️ New tag index:', tagSelectedIndex);
-    
-    // Yeni seçimi işaretle
-    items[tagSelectedIndex].classList.add('selected');
-    items[tagSelectedIndex].style.background = '#007acc';
-    items[tagSelectedIndex].style.color = '#ffffff';
-    items[tagSelectedIndex].scrollIntoView({ block: 'nearest' });
-  }
-  
-  function selectCurrentTagSuggestion() {
-    if (!tagAutocompleteElement || tagSelectedIndex === -1) return false;
-    
-    const items = tagAutocompleteElement.querySelectorAll('.tag-autocomplete-item');
-    const selectedItem = items[tagSelectedIndex];
-    
-    if (selectedItem) {
-      const tagText = selectedItem.textContent.replace('#', '').trim();
-      selectTagSuggestion(tagText);
-      return true;
-    }
+    return true;
+  } catch (error) {
+    console.error('❌ Ses kaydı butonu ekleme hatası:', error);
     return false;
   }
-  
-  function navigateWikilinkAutocomplete(direction) {
-    if (!autocompleteElement) return;
-    
-    const items = autocompleteElement.querySelectorAll('.wikilink-autocomplete-item');
-    if (items.length === 0) return;
-    
-    // Mevcut seçili öğeyi bul
-    let currentIndex = -1;
-    items.forEach((item, index) => {
-      if (item.classList.contains('selected')) {
-        currentIndex = index;
-      }
-    });
-    
-    // Yeni indeksi hesapla
-    let newIndex;
-    if (direction === 'up') {
-      newIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-    } else {
-      newIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-    }
-    
-    // Seçimi güncelle
-    items.forEach(item => {
-      item.classList.remove('selected');
-      item.style.background = 'transparent';
-      item.style.border = 'none';
-    });
-    
-    items[newIndex].classList.add('selected');
-    items[newIndex].style.background = 'rgba(59, 130, 246, 0.15)';
-    items[newIndex].style.border = '1px solid rgba(59, 130, 246, 0.3)';
-    items[newIndex].scrollIntoView({ block: 'nearest' });
-    
-    selectedAutocompleteIndex = newIndex;
-  }
-  
-  function selectCurrentWikilinkSuggestion() {
-    if (!autocompleteElement || selectedAutocompleteIndex === -1) return;
-    
-    const items = autocompleteElement.querySelectorAll('.wikilink-autocomplete-item');
-    const selectedItem = items[selectedAutocompleteIndex];
-    if (!selectedItem) return;
-    
-    const titleElement = selectedItem.querySelector('div');
-    const noteTitle = titleElement.textContent.trim();
-    
-    const currentContent = editor.getData();
-    const lastOpenBracket = currentContent.lastIndexOf('[[');
-    const query = currentContent.substring(lastOpenBracket + 2);
-    
-    selectWikilinkSuggestion(noteTitle, query);
-  }
-  
-  // Keyboard shortcuts for autocomplete navigation
-  editor.keystrokes.set('ArrowUp', (evt, cancel) => {
-    if (autocompleteElement) {
-      cancel();
-      navigateWikilinkAutocomplete('up');
-    } else if (tagAutocompleteElement) {
-      cancel();
-      navigateTagAutocomplete('up');
-    }
-  });
-  
-  editor.keystrokes.set('ArrowDown', (evt, cancel) => {
-    if (autocompleteElement) {
-      cancel();
-      navigateWikilinkAutocomplete('down');
-    } else if (tagAutocompleteElement) {
-      cancel();
-      navigateTagAutocomplete('down');
-    }
-  });
-  
-  editor.keystrokes.set('Enter', (evt, cancel) => {
-    if (autocompleteElement) {
-      cancel();
-      selectCurrentWikilinkSuggestion();
-    } else if (tagAutocompleteElement) {
-      cancel();
-      selectCurrentTagSuggestion();
-    }
-  });
-  
-  editor.keystrokes.set('Esc', (evt, cancel) => {
-    if (autocompleteElement) {
-      cancel();
-      hideWikilinkAutocomplete();
-    } else if (tagAutocompleteElement) {
-      cancel();
-      hideTagAutocomplete();
-    }
-  });
-  
-  // İçerik değiştiğinde stats güncelle
-  editor.model.document.on('change:data', () => {
-    if (window.updateNotePanelStats && notePanelEditor) {
-      window.updateNotePanelStats(notePanelEditor.getData());
-    }
-  });
 }
 
-function setupHighlighting(editor) {
-  // CKEditor 5'te yazarken renkli görünüm için MutationObserver
-  let highlightingEnabled = true;
+// Ses kaydı modalı - BASİT VERSİYON
+function showAudioRecordingModal(note) {
+  const modal = document.createElement('div');
+  modal.innerHTML = `
+    <div id="audioRecordModal" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10003;display:flex;align-items:center;justify-content:center">
+      <div style="background:var(--noteditor-panel);border:1px solid var(--noteditor-border);border-radius:12px;padding:24px;min-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+        <h3 style="margin:0 0 16px 0;color:var(--noteditor-text);font-size:18px;font-weight:600">🎤 Ses Kaydı</h3>
+        <div id="audioRecordTime" style="margin-bottom:16px;color:var(--noteditor-accent);font-size:20px;font-weight:600;text-align:center">00:00</div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-bottom:16px">
+          <button id="audioRecordToggle" style="padding:12px 24px;background:linear-gradient(135deg,var(--noteditor-accent),var(--noteditor-accent2));border:none;border-radius:8px;color:#0a0d12;cursor:pointer;font-size:14px;font-weight:600">🔴 Kayıt Başlat</button>
+        </div>
+        <div id="audioRecordPlayerSection" style="margin-bottom:16px;display:none">
+          <div style="margin-bottom:8px;color:var(--noteditor-text);font-size:12px;opacity:0.7">Kaydı dinle:</div>
+          <audio id="audioRecordPlayer" controls style="width:100%;max-height:40px"></audio>
+        </div>
+        <div id="audioRecordNameSection" style="margin-bottom:16px;display:none">
+          <input type="text" id="audioRecordName" placeholder="Dosya adı (isteğe bağlı)" style="width:100%;padding:10px;background:rgba(255,255,255,.05);border:1px solid var(--noteditor-border);border-radius:6px;color:var(--noteditor-text);font-size:14px">
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button id="audioRecordCancel" style="padding:10px 20px;background:rgba(255,255,255,.05);border:1px solid var(--noteditor-border);border-radius:6px;color:var(--noteditor-text);cursor:pointer;font-size:14px">İptal</button>
+          <button id="audioRecordSave" style="padding:10px 20px;background:linear-gradient(135deg,var(--noteditor-accent),var(--noteditor-accent2));border:none;border-radius:6px;color:#0a0d12;cursor:pointer;font-size:14px;font-weight:600;display:none">💾 Kaydet</button>
+        </div>
+      </div>
+    </div>`;
   
-  const highlightText = () => {
-    if (!highlightingEnabled) return;
-    
-    const editable = document.querySelector('.ck-editor__editable');
-    if (!editable) return;
-    
-    // Tüm text node'ları bul
-    const walker = document.createTreeWalker(
-      editable,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode: function(node) {
-          // Zaten styled span içindeki text'leri atla
-          if (node.parentElement && 
-              (node.parentElement.classList.contains('tagtok') || 
-               node.parentElement.classList.contains('wikilink'))) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      },
-      false
-    );
-    
-    const textNodes = [];
-    let node;
-    while (node = walker.nextNode()) {
-      textNodes.push(node);
+  document.body.appendChild(modal);
+  
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let audioBlob = null;
+  let recordingTimer = null;
+  let recordingSeconds = 0;
+  let isRecording = false;
+  let audioStream = null;
+  
+  const timeDiv = document.getElementById('audioRecordTime');
+  const toggleBtn = document.getElementById('audioRecordToggle');
+  const saveBtn = document.getElementById('audioRecordSave');
+  const cancelBtn = document.getElementById('audioRecordCancel');
+  const nameSection = document.getElementById('audioRecordNameSection');
+  const nameInput = document.getElementById('audioRecordName');
+  const playerSection = document.getElementById('audioRecordPlayerSection');
+  const audioPlayer = document.getElementById('audioRecordPlayer');
+  
+  let audioBlobUrl = null; // Blob URL'ini sakla
+  
+  // Audio player'ı göster ve blob URL'i ayarla
+  const showAudioPlayer = () => {
+    if (audioBlob && audioPlayer) {
+      if (audioBlobUrl) {
+        URL.revokeObjectURL(audioBlobUrl); // Önceki URL'i temizle
+      }
+      audioBlobUrl = URL.createObjectURL(audioBlob);
+      audioPlayer.src = audioBlobUrl;
+      playerSection.style.display = 'block';
     }
-    
-    highlightingEnabled = false; // Sonsuz döngü önle
-    
-    textNodes.forEach(textNode => {
-      let text = textNode.textContent;
-      let changed = false;
-      
-      // Etiket kontrolü: #etiket
-      if (/#[a-z0-9ğüşiöçıİĞÜŞİÖÇ\-_]+/i.test(text)) {
-        text = text.replace(/#([a-z0-9ğüşiöçıİĞÜŞİÖÇ\-_]+)/gi, 
-          '<span class="tagtok" style="background: rgba(167,139,250,0.2); color: #a78bfa; padding: 0.1em 0.4em; border-radius: 4px; font-weight: 500;">#$1</span>');
-        changed = true;
-      }
-      
-      // Wikilink kontrolü: [[bağlantı]]
-      if (/\[\[[^\]]+\]\]/.test(text)) {
-        text = text.replace(/\[\[([^\]]+)\]\]/g, 
-          '<span class="wikilink" style="background: rgba(125,211,252,0.2); color: #7dd3fc; padding: 0.1em 0.4em; border-radius: 4px; font-weight: 500;" data-link="$1">[[$1]]</span>');
-        changed = true;
-      }
-      
-      if (changed) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = text;
-        
-        // Text node'u yeni elementlerle değiştir
-        const fragment = document.createDocumentFragment();
-        while (tempDiv.firstChild) {
-          fragment.appendChild(tempDiv.firstChild);
-        }
-        textNode.parentNode.replaceChild(fragment, textNode);
-      }
-    });
-    
-    setTimeout(() => {
-      highlightingEnabled = true;
-    }, 100);
   };
   
-  // CKEditor 5'in DOM değişikliklerini izle
-  const observer = new MutationObserver(() => {
-    setTimeout(highlightText, 50);
-  });
-  
-  // CKEditor hazır olduğunda observer'ı başlat
-  setTimeout(() => {
-    const editable = document.querySelector('.ck-editor__editable');
-    if (editable) {
-      observer.observe(editable, {
-        childList: true,
-        subtree: true,
-        characterData: true
-      });
-      highlightText(); // İlk highlight
+  const close = () => {
+    // Blob URL'ini temizle
+    if (audioBlobUrl) {
+      URL.revokeObjectURL(audioBlobUrl);
+      audioBlobUrl = null;
     }
-  }, 500);
-}
-
-function setupKeyboardShortcuts(editor) {
-  // Etiket ekleme kısayolu
-  editor.keystrokes.set('Ctrl+Shift+T', (evt, cancel) => {
-    cancel();
-    const tagName = prompt('Etiket adı:');
-    if (tagName && tagName.trim()) {
-      const cleanTag = tagName.trim().replace(/[^a-zA-Z0-9ğüşiöçıİĞÜŞİÖÇ\-_]/g, '');
-      if (cleanTag) {
-        editor.model.change(writer => {
-          const insertPosition = editor.model.document.selection.getFirstPosition();
-          writer.insertText(`#${cleanTag}`, insertPosition);
-        });
-      }
+    if (audioStream) {
+      audioStream.getTracks().forEach(track => track.stop());
     }
-  });
-  
-  // Bağlantı ekleme kısayolu - Diğer notlarla bağlantı
-  editor.keystrokes.set('Ctrl+Shift+L', (evt, cancel) => {
-    cancel();
-    
-    // Mevcut notları listele
-    const noteList = window.notes.map(note => `${note.id}: ${note.title}`).join('\n');
-    const linkName = prompt(`Bağlantı adı:\n\nMevcut notlar:\n${noteList}\n\nBağlantı adını yazın:`);
-    
-    if (linkName && linkName.trim()) {
-      const cleanLink = linkName.trim();
-      editor.model.change(writer => {
-        const insertPosition = editor.model.document.selection.getFirstPosition();
-        writer.insertText(`[[${cleanLink}]]`, insertPosition);
-      });
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
     }
+    if (recordingTimer) {
+      clearInterval(recordingTimer);
+    }
+    if (document.body.contains(modal)) {
+      document.body.removeChild(modal);
+    }
+  };
+  
+  cancelBtn.onclick = close;
+  modal.addEventListener('click', (e) => {
+    if (e.target.id === 'audioRecordModal') close();
   });
   
-  // Kaydetme kısayolu
-  editor.keystrokes.set('Ctrl+S', (evt, cancel) => {
-    cancel();
-    saveNotePanelNote();
-  });
-}
-
-function loadNoteData(editor, targetNoteId) {
-  const notePanelTitleInput = document.getElementById('notePanelTitleInput');
-  
-  // Mevcut not verilerini yükle
-  if (targetNoteId) {
-    const note = window.notes.find(n => n.id === targetNoteId);
-    if (note) {
-      notePanelTitleInput.value = note.title === 'Başlıksız Not' ? '' : note.title;
+  // Mikrofon erişimi
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+      audioStream = stream;
       
-      // Not içeriğini yükle
-      let textToLoad = note.text;
+      toggleBtn.onclick = () => {
+        if (!isRecording) {
+          // Kayıt başlat
+          audioChunks = [];
+          recordingSeconds = 0;
+          timeDiv.textContent = '00:00';
+          
+          mediaRecorder = new MediaRecorder(stream);
+          
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              audioChunks.push(event.data);
+            }
+          };
+          
+          mediaRecorder.onstop = () => {
+            audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            isRecording = false;
+            toggleBtn.textContent = '🔴 Kayıt Başlat';
+            toggleBtn.style.background = 'linear-gradient(135deg,var(--noteditor-accent),var(--noteditor-accent2))';
+            nameSection.style.display = 'block';
+            saveBtn.style.display = 'inline-block';
+            
+            // Audio player'ı göster (dinleme için)
+            showAudioPlayer();
+          };
+          
+          mediaRecorder.start();
+          isRecording = true;
+          toggleBtn.textContent = '⏹️ Kayıt Durdur';
+          toggleBtn.style.background = 'rgba(239,68,68,.2)';
+          toggleBtn.style.color = '#ef4444';
+          
+          // Timer başlat
+          recordingTimer = setInterval(() => {
+            recordingSeconds++;
+            const minutes = Math.floor(recordingSeconds / 60);
+            const seconds = recordingSeconds % 60;
+            timeDiv.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+          }, 1000);
+        } else {
+          // Kayıt durdur
+          if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+          }
+          if (recordingTimer) {
+            clearInterval(recordingTimer);
+            recordingTimer = null;
+          }
+        }
+      };
       
-      // Eğer not HTML içeriyorsa direkt kullan, yoksa Markdown'dan HTML'e çevir
-      if (textToLoad.includes('<') && textToLoad.includes('>')) {
-        // HTML içerik - entity'leri decode et ve HR etiketlerini kontrol et
-        textToLoad = window.decodeHtmlEntities ? window.decodeHtmlEntities(textToLoad) : textToLoad;
+      saveBtn.onclick = async () => {
+        if (!audioBlob) return;
         
-        // Eğer HR etiketleri varsa custom-hr class'ı ekle
-        textToLoad = textToLoad.replace(/<hr([^>]*?)>/gi, '<hr class="custom-hr"$1>');
+        saveBtn.disabled = true;
         
-        editor.setData(textToLoad);
-      } else {
-        // Markdown içerik - basit dönüştürme
-        textToLoad = textToLoad
-          .replace(/^---\s*$/gm, '<hr class="custom-hr">')  // --- çizgilerini HR etiketine çevir
-          .replace(/^\*\*\*\s*$/gm, '<hr class="custom-hr">')  // *** çizgilerini HR etiketine çevir
-          .replace(/\n/g, '<br>')
-          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-          .replace(/\*(.*?)\*/g, '<em>$1</em>')
-          .replace(/\[\[([^\]]+)\]\]/g, '<span class="wikilink" data-link="$1">[[$1]]</span>')
-          .replace(/#([a-z0-9ğüşiöçıİĞÜŞİÖÇ\-_]+)/g, '<span class="tagtok">#$1</span>');
-        editor.setData(textToLoad);
-      }
-      
-      updateNotePanelStats(note.text);
-      notePanelCurrentNoteId = targetNoteId;
-    }
-  } else {
-    // Yeni not modu
-    notePanelTitleInput.value = '';
-    editor.setData('');
-    updateNotePanelStats('');
-    notePanelCurrentNoteId = null;
-  }
-  
-  // Stats'i güncelle
-  updateNotePanelStats(editor.getData());
+        try {
+          if (typeof require === 'undefined') {
+            throw new Error('Electron ortamı yok');
+          }
+          
+          const { ipcRenderer } = require('electron');
+          
+          // Dosya adı oluştur
+          const fileName = nameInput.value.trim() || `ses_kaydi_${Date.now()}.webm`;
+          const finalFileName = fileName.endsWith('.webm') ? fileName : `${fileName}.webm`;
+          
+          // Blob'u ArrayBuffer'a çevir
+          const arrayBuffer = await audioBlob.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          
+          // IPC ile dosyayı kaydet
+          const result = await ipcRenderer.invoke('save-uploaded-file', {
+            noteId: note.id,
+            fileName: finalFileName,
+            fileData: buffer,
+            fileType: 'audio/webm',
+            isImage: false,
+            isAudio: true
+          });
+          
+          if (result.success) {
+            const fullPath = result.filePath;
+            
+            // Ses dosyası için HTML audio tag oluştur
+            let normalizedPath = fullPath.replace(/\\/g, '/');
+            let fileUrl;
+            if (normalizedPath.match(/^[A-Za-z]:\//)) {
+              fileUrl = `file:///${normalizedPath}`;
+            } else {
+              fileUrl = `file://${normalizedPath}`;
+            }
+            
+            // HTML audio tag'i oluştur
+            const audioHtml = `<audio controls><source src="${fileUrl}" type="audio/webm">Tarayıcınız ses oynatmayı desteklemiyor.</audio>`;
+            
+            // Vditor'a ses dosyasını ekle
+            if (notePanelEditor) {
+              const current = notePanelEditor.getValue();
+              const audioContent = `\n\n${audioHtml}\n\n`;
+              notePanelEditor.setValue(current + audioContent);
+            }
+            
+            // Modal'ı kapat
+            close();
+          } else {
+            throw new Error(result.error || 'Dosya kaydedilemedi');
+          }
+        } catch (error) {
+          console.error('❌ Ses kaydı kaydetme hatası:', error);
+          if (window.showAlertModal) {
+            window.showAlertModal('Hata', 'Hata: ' + error.message, 'error');
+          } else {
+            alert('Hata: ' + error.message);
+          }
+          saveBtn.disabled = false;
+        }
+      };
+    })
+    .catch(error => {
+      console.error('❌ Mikrofon erişim hatası:', error);
+      toggleBtn.disabled = true;
+      toggleBtn.textContent = '❌ Mikrofon Erişimi Yok';
+    });
 }
 
-// Global exports
+// Global fonksiyonlar
 window.openNotePanel = openNotePanel;
 window.closeNotePanel = closeNotePanel;
-window.saveNotePanelNote = saveNotePanelNote;
-window.updateNotePanelStats = updateNotePanelStats;
-window.notePanelEditor = notePanelEditor;
-window.notePanelCurrentNoteId = notePanelCurrentNoteId;
+window.saveNotePanelNote = saveCurrentNoteContent;
 
-console.log('📝 Note Panel System yüklendi');
-
+console.log('📝 Not Panel Sistemi yüklendi');

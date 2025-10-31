@@ -2,16 +2,22 @@
 
 // Yardım Modal Fonksiyonları
 function openHelpModal() {
-  const helpModal = document.getElementById('helpModal');
-  if (helpModal) {
-    helpModal.style.display = 'flex';
-    helpModal.style.opacity = '0';
-    helpModal.style.transform = 'scale(0.9)';
-    
-    setTimeout(() => {
-      helpModal.style.opacity = '1';
-      helpModal.style.transform = 'scale(1)';
-    }, 10);
+  // Tutorial'ı aç (yardım butonu tutorial'ı açacak)
+  if (window.openTutorial) {
+    window.openTutorial();
+  } else {
+    // Eğer tutorial yüklenmediyse eski yardım modal'ını aç
+    const helpModal = document.getElementById('helpModal');
+    if (helpModal) {
+      helpModal.style.display = 'flex';
+      helpModal.style.opacity = '0';
+      helpModal.style.transform = 'scale(0.9)';
+      
+      setTimeout(() => {
+        helpModal.style.opacity = '1';
+        helpModal.style.transform = 'scale(1)';
+      }, 10);
+    }
   }
 }
 
@@ -215,8 +221,92 @@ function showMoveToFolderDialog(noteId) {
   });
 }
 
+// Alert Modal Fonksiyonları
+function showAlertModal(title, message, type = 'info') {
+  const modal = document.getElementById('alertModal');
+  const titleEl = document.getElementById('alertModalTitle');
+  const messageEl = document.getElementById('alertModalMessage');
+  
+  if (!modal || !titleEl || !messageEl) {
+    console.error('❌ Alert modal elementleri bulunamadı');
+    // Fallback: window.alert kullan
+    window.alert(message);
+    return;
+  }
+  
+  titleEl.textContent = title || 'Bilgi';
+  messageEl.textContent = message || '';
+  
+  // Tip'e göre icon ve renk ayarla
+  if (type === 'error') {
+    titleEl.innerHTML = '⚠️ Hata';
+    modal.querySelector('.modal').style.borderColor = 'var(--danger)';
+  } else if (type === 'warning') {
+    titleEl.innerHTML = '⚠️ Uyarı';
+    modal.querySelector('.modal').style.borderColor = '#f59e0b';
+  } else if (type === 'success') {
+    titleEl.innerHTML = '✅ Başarılı';
+    modal.querySelector('.modal').style.borderColor = 'var(--ok)';
+  } else {
+    titleEl.innerHTML = 'ℹ️ Bilgi';
+    modal.querySelector('.modal').style.borderColor = 'var(--accent)';
+  }
+  
+  // Z-index'i not editörünün üstünde olacak şekilde ayarla (not editörü z-index: 10000)
+  modal.style.zIndex = '50000';
+  
+  modal.classList.add('show');
+  modal.style.display = 'flex';
+  modal.style.opacity = '0';
+  modal.style.transform = 'scale(0.9)';
+  
+  // Modal'ı body'nin en sonuna taşı ki DOM sırasında da en üstte olsun
+  document.body.appendChild(modal);
+  
+  setTimeout(() => {
+    modal.style.opacity = '1';
+    modal.style.transform = 'scale(1)';
+  }, 10);
+  
+  // Tamam butonuna odaklan
+  const okBtn = modal.querySelector('.modal-btn');
+  if (okBtn) {
+    okBtn.focus();
+    
+    // Enter tuşu ile kapatma
+    const handleKeydown = (e) => {
+      if (e.key === 'Enter' || e.key === 'Escape') {
+        closeAlertModal();
+        document.removeEventListener('keydown', handleKeydown);
+      }
+    };
+    document.addEventListener('keydown', handleKeydown);
+  }
+}
+
+function closeAlertModal() {
+  const modal = document.getElementById('alertModal');
+  if (modal) {
+    modal.style.opacity = '0';
+    modal.style.transform = 'scale(0.9)';
+    
+    setTimeout(() => {
+      modal.classList.remove('show');
+      modal.style.display = 'none';
+      
+      // Border rengini sıfırla
+      const modalContent = modal.querySelector('.modal');
+      if (modalContent) {
+        modalContent.style.borderColor = '';
+      }
+    }, 200);
+  }
+}
+
 // Global exports
 window.openHelpModal = openHelpModal;
+window.showAlertModal = showAlertModal;
+window.closeAlertModal = closeAlertModal;
 // Klasör silme modal fonksiyonları
 function closeDeleteFolderModal() {
   const DOM = window.DOM || {};
@@ -250,7 +340,10 @@ function confirmDeleteFolder() {
   // Klasördeki notları klasörsüz yap
   let movedNotesCount = 0;
   window.notes.forEach(note => {
-    if (note.folderId === folderToDelete) {
+    // Genel eşleştirme fonksiyonu kullan
+    const folder = window.folders.find(f => f.id === folderToDelete);
+    const isMatch = window.doesNoteMatchFolder ? window.doesNoteMatchFolder(note.folderId, folderToDelete, folder) : (note.folderId === folderToDelete);
+    if (isMatch) {
       note.folderId = null;
       movedNotesCount++;
     }
@@ -336,6 +429,8 @@ function confirmDeleteFolder() {
 }
 
 window.closeHelpModal = closeHelpModal;
+window.closeDeleteFolderModal = closeDeleteFolderModal;
+window.confirmDeleteFolder = confirmDeleteFolder;
 window.openSettingsModal = openSettingsModal;
 window.closeSettingsModal = closeSettingsModal;
 window.showInputModal = showInputModal;

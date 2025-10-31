@@ -19,7 +19,7 @@ function openNotesFolder() {
 
 // Tablo stillerini dinamik olarak ekle
 function addTableStyles() {
-  const styleId = 'ckeditor-table-styles';
+  const styleId = 'vditor-table-styles';
   let styleElement = document.getElementById(styleId);
   
   if (!styleElement) {
@@ -29,7 +29,7 @@ function addTableStyles() {
   }
   
   styleElement.textContent = `
-    /* CKEditor Tablo Stilleri - Dinamik Override */
+    /* Vditor Tablo Stilleri - Dinamik Override */
     .ck-editor__editable table,
     .ck-editor__editable table[data-cke-table],
     .ck-editor__editable .table table,

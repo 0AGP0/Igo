@@ -322,7 +322,14 @@ function renderGraph() {
     if (folder.x === undefined || folder.y === undefined) return;
     
     // Bu klasördeki notları bul
-    const folderNotes = notes.filter(note => note.folderId === folder.id);
+    // Genel eşleştirme fonksiyonu kullan
+    const folderNotes = notes.filter(note => {
+      if (window.doesNoteMatchFolder) {
+        return window.doesNoteMatchFolder(note.folderId, folder.id, folder);
+      }
+      // Fallback
+      return note.folderId === folder.id;
+    });
     
     folderNotes.forEach(note => {
       if (note.x === undefined || note.y === undefined) return;

@@ -19,7 +19,14 @@ function renderFoldersOnBoard() {
     const folderNameMatch = folder.name.toLowerCase().includes(state.searchQuery.toLowerCase());
     
     // Klasördeki notlar arama sorgusuyla eşleşiyor mu?
-    const folderNotes = notes.filter(note => note.folderId === folder.id);
+    // Genel eşleştirme fonksiyonu kullan
+    const folderNotes = notes.filter(note => {
+      if (window.doesNoteMatchFolder) {
+        return window.doesNoteMatchFolder(note.folderId, folder.id, folder);
+      }
+      // Fallback
+      return note.folderId === folder.id;
+    });
     const hasMatchingNotes = folderNotes.some(note => 
       note.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
       note.text.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
@@ -34,7 +41,14 @@ function renderFoldersOnBoard() {
   });
   
   filteredFolders.forEach((folder, index) => {
-    const folderNotes = notes.filter(note => note.folderId === folder.id);
+    // Genel eşleştirme fonksiyonu kullan
+    const folderNotes = notes.filter(note => {
+      if (window.doesNoteMatchFolder) {
+        return window.doesNoteMatchFolder(note.folderId, folder.id, folder);
+      }
+      // Fallback
+      return note.folderId === folder.id;
+    });
     
     // Klasör pozisyonunu hesapla
     let x, y;

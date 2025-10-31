@@ -36,25 +36,47 @@ function generateUniqueId(baseName, type = 'note') {
 
 // Etiket parse etme
 function parseTags(text) {
+  if (!text || typeof text !== 'string') return [];
+  
   const tags = [];
   
-  // HTML içindeki etiketleri yakala (CKEditor 5'den gelen)
+  // HTML içindeki etiketleri yakala (Vditor'dan gelen)
   const htmlTagMatches = text.match(/<span class="tagtok">#([^<]+)<\/span>/g);
   
   if (htmlTagMatches) {
     htmlTagMatches.forEach(match => {
       const tagMatch = match.match(/<span class="tagtok">#([^<]+)<\/span>/);
-      if (tagMatch) {
-        tags.push(tagMatch[1].toLowerCase());
+      if (tagMatch && tagMatch[1]) {
+        const tag = tagMatch[1].trim().toLowerCase();
+        if (tag && !tags.includes(tag)) {
+          tags.push(tag);
+        }
       }
     });
   }
   
-  // Düz metindeki etiketleri yakala (eski notlar için)
-  let match;
+  // Düz metindeki etiketleri yakala (eski notlar ve yeni notlar için)
+  // HTML etiketlerini kaldır (sadece metni al)
+  const textWithoutHtml = text.replace(/<[^>]+>/g, '');
+  
+  // Regex ile etiketleri bul
   const regex = new RegExp(REGEX.TAGS.source, REGEX.TAGS.flags);
-  while ((match = regex.exec(text)) !== null) {
-    tags.push(match[1].toLowerCase());
+  let match;
+  // Regex'in lastIndex'ini sıfırla
+  regex.lastIndex = 0;
+  
+  while ((match = regex.exec(textWithoutHtml)) !== null) {
+    if (match[1]) {
+      const tag = match[1].trim().toLowerCase();
+      if (tag && !tags.includes(tag)) {
+        tags.push(tag);
+      }
+    }
+    
+    // Sonsuz döngüyü önle (aynı pozisyonda kalıyorsa dur)
+    if (match.index === regex.lastIndex) {
+      regex.lastIndex++;
+    }
   }
   
   return [...new Set(tags)];
@@ -64,7 +86,7 @@ function parseTags(text) {
 function parseWikilinks(text) {
   const links = [];
   
-  // HTML içindeki wikilinkleri yakala (CKEditor 5'den gelen)
+  // HTML içindeki wikilinkleri yakala (Vditor'dan gelen)
   const htmlLinkMatches = text.match(/<span class="wikilink"[^>]*data-link="([^"]+)"[^>]*>\[\[[^\]]+\]\]<\/span>/g);
   if (htmlLinkMatches) {
     htmlLinkMatches.forEach(match => {
@@ -100,7 +122,7 @@ function escapeRegex(string) {
 function generateFileName(title, originalExtension = '.md') {
   return title
     .replace(/[<>:"/\\|?*]/g, '') // Geçersiz karakterleri temizle
-    .replace(/\s+/g, '_') // Boşlukları alt çizgi ile değiştir
+    // Boşlukları koru (alt çizgi ile değiştirme)
     .substring(0, 50) + originalExtension; // Orijinal uzantıyı kullan
 }
 

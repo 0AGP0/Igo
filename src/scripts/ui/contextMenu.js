@@ -206,6 +206,9 @@ function showFolderContextMenu(e, folderId) {
     <div class="context-menu-item" onclick="createNoteInFolder('${folderId}')">
       📝 Not Ekle
     </div>
+    <div class="context-menu-item" onclick="createSubFolder('${folderId}')">
+      📁 Alt Klasör Oluştur
+    </div>
     <div class="context-menu-divider"></div>
     <div class="context-menu-item" onclick="renameFolder('${folderId}')">
       ✏️ Yeniden Adlandır
