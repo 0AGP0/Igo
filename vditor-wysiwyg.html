@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Vditor — Türkçe WYSIWYG Demo (Fix)</title>
+  <link rel="stylesheet" href="https://unpkg.com/vditor/dist/index.css">
+</head>
+<body>
+  <div id="vditor"></div>
+
+  <script src="https://unpkg.com/vditor/dist/index.min.js"></script>
+  <script>
+    // 1) TR sözlüğünü oluştur
+    const TR = {
+      'bold': 'Kalın',
+      'italic': 'İtalik',
+      'strike': 'Üstü çizili',
+      'heading': 'Başlık',
+      'quote': 'Alıntı',
+      'list': 'Liste',
+      'ordered-list': 'Numaralı liste',
+      'check': 'Görev listesi',
+      'code': 'Kod Bloğu',
+      'inline-code': 'Satır içi kod',
+      'table': 'Tablo',
+      'link': 'Bağlantı',
+      'image': 'Resim',
+      'upload': 'Yükle',
+      'undo': 'Geri al',
+      'redo': 'Yinele',
+      'preview': 'Önizleme',
+      'both': 'Her ikisi',
+      'edit-mode': 'Düzenleme modu',
+      'wysiwyg': 'WYSIWYG',
+      'ir': 'Anında işleme',
+      'sv': 'Ayrı görünüm',
+      'ok': 'Tamam',
+      'cancel': 'İptal',
+      'placeholder': 'Notlarınızı yazmaya başlayın...',
+      'help': 'Yardım',
+      'upload-error': 'Yükleme hatası',
+      'copy': 'Kopyala',
+      'copied': 'Kopyalandı!',
+    };
+
+    // 2) Editörü başlatırken HEM lang HEM de i18n ver
+    const vd = new Vditor('vditor', {
+      height: 520,
+      lang: 'tr_TR',      // istediğin anahtar
+      i18n: TR,           // ÖNEMLİ: i18n geçince whitelist kontrolü bypass olur
+      theme: 'classic',
+      cache: { enable: false },
+      placeholder: TR['placeholder'],
+      value: '# Merhaba!\n\nBu editör **Türkçe** arayüz ile çalışıyor.',
+      mode: 'wysiwyg',
+    });
+  </script>
+</body>
+</html>

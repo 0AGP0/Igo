@@ -1,0 +1,731 @@
+/* ===== NOT DÜZENLEYİCİ TASARIMI - KOYU TEMA & GÖRÜNÜRLÜK ===== */
+
+:root {
+  --noteditor-bg: #0a0d12;
+  --noteditor-panel: #0f1419;
+  --noteditor-elev: #121722;
+  --noteditor-text: #e9eef5;
+  --noteditor-muted: #9aa3ad;
+  --noteditor-border: #1a2332;
+  --noteditor-accent: #7dd3fc;
+  --noteditor-accent2: #a78bfa;
+  --noteditor-shadow: 0 14px 38px rgba(0,0,0,.5);
+}
+
+/* Not Düzenleyici Overlay */
+.note-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(11, 15, 21, 0.95);
+  backdrop-filter: blur(20px);
+  z-index: 10000;
+  display: none;
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.note-panel-overlay.active {
+  display: flex;
+  opacity: 1;
+}
+
+/* Not Düzenleyici Container */
+.note-panel-container {
+  display: flex;
+  flex-direction: column;
+  width: 97%;
+  height: 96%;
+  max-width: 1600px;
+  margin: auto;
+  background: var(--noteditor-panel);
+  border: 1px solid var(--noteditor-border);
+  border-radius: 20px;
+  box-shadow: var(--noteditor-shadow);
+  overflow: hidden;
+  position: relative;
+  backdrop-filter: blur(20px);
+  animation: panelSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes panelSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Not Düzenleyici Header - SADECE KONTROLLER */
+.note-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--noteditor-border);
+  flex-shrink: 0;
+  user-select: none;
+  /* cursor: move kaldırıldı - widget gibi sadece drag başladığında JavaScript ile ayarlanacak */
+}
+
+.note-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--noteditor-text);
+}
+
+/* Not Başlık Bölümü - AYRI */
+.note-title-section {
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--noteditor-border);
+  flex-shrink: 0;
+  /* cursor: move kaldırıldı - widget gibi sadece drag başladığında JavaScript ile ayarlanacak */
+  user-select: none;
+}
+
+.note-title-input-container {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 12px;
+  transition: all 0.2s ease;
+  cursor: text;
+  user-select: text;
+}
+
+.note-title-input-container:focus-within {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(125, 211, 252, 0.3);
+}
+
+.note-panel-title-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--noteditor-text);
+  font-size: 15px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  padding: 0;
+  cursor: text;
+}
+
+.note-panel-title-input:focus {
+  outline: none;
+}
+
+.note-panel-title-input::placeholder {
+  color: var(--noteditor-muted);
+  font-weight: 400;
+  opacity: 0.5;
+}
+
+.note-panel-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.panel-control-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--noteditor-text);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.panel-control-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+/* Not Düzenleyici Content */
+.note-panel-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Not Editör Bölümü */
+.note-editor-section {
+  flex: 1;
+  padding: 20px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+/* Vditor Container - KOYU ARKA PLAN */
+.vditor {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+  -webkit-app-region: no-drag;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--noteditor-panel) !important;
+  border: none !important;
+}
+
+/* Vditor Content Area - KOYU ARKA PLAN */
+.vditor-content {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  -webkit-app-region: no-drag;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  background: var(--noteditor-panel) !important;
+}
+
+/* Vditor Toolbar - KOYU TEMA */
+.vditor-toolbar {
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid var(--noteditor-border) !important;
+  border-radius: 8px 8px 0 0 !important;
+  padding: 10px 14px !important;
+  -webkit-app-region: no-drag !important;
+  position: relative !important;
+  z-index: 10 !important;
+  flex-shrink: 0 !important;
+}
+
+.vditor-toolbar button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--noteditor-text);
+  transition: all 0.15s ease;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  position: relative;
+  z-index: 11;
+  padding: 6px 8px;
+  font-size: 14px;
+}
+
+.vditor-toolbar button:hover {
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.vditor-toolbar button:active {
+  background: rgba(255,255,255,.15);
+  transform: scale(0.95);
+}
+
+.vditor-toolbar button.active {
+  background: var(--noteditor-accent);
+  color: #0b0f14;
+  border-color: var(--noteditor-accent);
+}
+
+/* Vditor WYSIWYG Editor - KOYU TEMA OVERRIDE */
+.vditor-wysiwyg {
+  flex: 1;
+  min-height: 400px;
+  height: 100%;
+  background: var(--noteditor-panel) !important;
+  border: none !important;
+  outline: none !important;
+  color: var(--noteditor-text) !important;
+  font-size: 16px !important;
+  font-family: 'Inter', sans-serif !important;
+  line-height: 1.6 !important;
+  padding: 20px !important;
+  overflow-y: auto !important;
+  -webkit-app-region: no-drag !important;
+  cursor: text !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  z-index: 1 !important;
+  position: relative !important;
+}
+
+/* Vditor'un TÜM elementlerini koyu yap */
+.vditor-wysiwyg * {
+  color: var(--noteditor-text) !important;
+}
+
+/* Vditor content background override */
+.vditor-content {
+  background: var(--noteditor-panel) !important;
+}
+
+/* Vditor Outline - Left Sidebar - KÜÇÜK BOYUT */
+.vditor-outline {
+  background: var(--noteditor-elev);
+  border-right: 1px solid var(--noteditor-border);
+  width: 200px;
+  min-width: 180px;
+  max-width: 220px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: visible;
+  padding: 16px;
+  position: relative;
+  z-index: 1; /* Outline altta olmalı */
+}
+
+.vditor-outline .vditor-outline__title {
+  color: #e9eef5 !important;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--noteditor-border);
+}
+
+/* Outline Items - H1/H2/H3 İçin Farklı Renkler */
+.vditor-outline a,
+.vditor-outline .vditor-outline__item {
+  color: #e9eef5 !important;
+  font-size: 12px;
+  padding: 6px 10px;
+  margin: 3px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  text-decoration: none;
+  display: block;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  width: 100%;
+  line-height: 1.5;
+  overflow: visible;
+}
+
+/* H1 - Mor */
+.vditor-outline a[href*="#"]:first-child,
+.vditor-outline .vditor-outline__item:nth-of-type(1) {
+  color: #a78bfa !important;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* H2 - Cyan */
+.vditor-outline a:nth-of-type(2),
+.vditor-outline .vditor-outline__item:nth-of-type(2) {
+  color: #7dd3fc !important;
+  font-weight: 600;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+/* H3 - Açık Gri */
+.vditor-outline a:nth-of-type(3),
+.vditor-outline .vditor-outline__item:nth-of-type(3) {
+  color: #adb3c0 !important;
+  font-weight: 500;
+  font-size: 11px;
+  margin-left: 16px;
+}
+
+.vditor-outline a:hover,
+.vditor-outline .vditor-outline__item:hover {
+  background: rgba(125, 211, 252, 0.15);
+  color: var(--noteditor-accent) !important;
+}
+
+/* ===== VDITOR İÇERİK STİLLERİ - KOYU TEMA & GÖRÜNÜRLÜK ===== */
+
+/* Headers - Parlak Renkler */
+.vditor-wysiwyg h1 {
+  font-size: 2em;
+  font-weight: 700;
+  color: #a78bfa !important;
+  margin: 24px 0 12px 0;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #233041 !important;
+}
+
+.vditor-wysiwyg h2 {
+  font-size: 1.6em;
+  font-weight: 700;
+  color: #a78bfa !important;
+  margin: 20px 0 10px 0;
+}
+
+.vditor-wysiwyg h3 {
+  font-size: 1.3em;
+  font-weight: 600;
+  color: #7dd3fc !important;
+  margin: 18px 0 8px 0;
+}
+
+.vditor-wysiwyg h4 {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #e9eef5 !important;
+  margin: 16px 0 6px 0;
+}
+
+.vditor-wysiwyg h5 {
+  font-size: 1em;
+  font-weight: 600;
+  color: #e9eef5 !important;
+  margin: 14px 0 4px 0;
+}
+
+.vditor-wysiwyg h6 {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #adb3c0 !important;
+  margin: 12px 0 4px 0;
+}
+
+/* Text Formatting - Görünür Renkler */
+.vditor-wysiwyg strong {
+  font-weight: 700;
+  color: #ffffff !important;
+}
+
+.vditor-wysiwyg em {
+  font-style: italic;
+  color: #9aa3ad !important;
+}
+
+.vditor-wysiwyg s {
+  text-decoration: line-through;
+  color: #9aa3ad !important;
+  opacity: 0.7;
+}
+
+.vditor-wysiwyg code {
+  background: #1a2332 !important;
+  color: #a78bfa !important;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  border: 1px solid #2a3548 !important;
+}
+
+.vditor-wysiwyg mark {
+  background: rgba(255, 235, 59, 0.4) !important;
+  color: #0a0d12 !important;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+/* Paragraphs - Açık Renk */
+.vditor-wysiwyg p {
+  color: #e9eef5 !important;
+  line-height: 1.7;
+  margin: 8px 0;
+}
+
+/* Links */
+.vditor-wysiwyg a {
+  color: #7dd3fc !important;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(125, 211, 252, 0.3);
+  transition: all 0.2s ease;
+}
+
+.vditor-wysiwyg a:hover {
+  color: #0ea5e9 !important;
+  border-bottom-color: #0ea5e9;
+}
+
+/* Lists - Görünür İşaretler */
+.vditor-wysiwyg ul, 
+.vditor-wysiwyg ol {
+  color: #e9eef5 !important;
+  padding-left: 24px;
+  margin: 12px 0;
+}
+
+.vditor-wysiwyg li {
+  color: #e9eef5 !important;
+  line-height: 1.6;
+  margin: 4px 0;
+}
+
+/* Blockquotes - Modern Koyu Tasarım */
+.vditor-wysiwyg blockquote {
+  border-left: 4px solid var(--noteditor-accent) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  padding: 14px 20px !important;
+  margin: 16px 0 !important;
+  border-radius: 0 8px 8px 0 !important;
+  color: #d1d8e3 !important;
+  font-style: normal !important;
+}
+
+.vditor-wysiwyg blockquote p {
+  color: #d1d8e3 !important;
+  margin: 0;
+}
+
+/* Tables - Koyu Tema */
+.vditor-wysiwyg table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  margin: 20px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.vditor-wysiwyg table td,
+.vditor-wysiwyg table th {
+  background: var(--noteditor-elev) !important;
+  color: #e9eef5 !important;
+  border: 1px solid #1a2332 !important;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+.vditor-wysiwyg table th {
+  background: rgba(0, 0, 0, 0.4) !important;
+  color: #e9eef5 !important;
+  font-weight: 600;
+}
+
+/* Hover - Siyah Renk Her Zaman */
+.vditor-wysiwyg table tr:hover td {
+  background: var(--noteditor-elev) !important;
+}
+
+/* Horizontal Rules */
+.vditor-wysiwyg hr {
+  border: none;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #7dd3fc, transparent);
+  margin: 24px 0;
+  opacity: 0.6;
+}
+
+/* ===== VDITOR TOOLBAR - KOYU TEMA ===== */
+.vditor-toolbar {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid var(--noteditor-border) !important;
+  border-radius: 8px 8px 0 0 !important;
+  padding: 10px 14px !important;
+}
+
+.vditor-toolbar button {
+  color: #e9eef5 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+}
+
+.vditor-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+
+.vditor-toolbar button.active {
+  background: var(--noteditor-accent) !important;
+  color: #0a0d12 !important;
+  border-color: var(--noteditor-accent) !important;
+}
+
+/* ===== VDITOR DROPDOWN VE MODAL - KOYU TEMA ===== */
+.vditor-dropdown,
+.vditor-modal,
+.vditor-hint,
+.vditor-panel {
+  background: var(--noteditor-elev) !important;
+  border: 1px solid var(--noteditor-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+  z-index: 10002 !important; /* Outline'ın üstünde */
+  position: fixed !important; /* Fixed olmalı ki toolbar'ı uzatmasın */
+}
+
+/* More (⋯) butonu dropdown'ı - tamamen opak arkaplan */
+.vditor-toolbar .vditor-dropdown,
+.vditor-toolbar .vditor-panel,
+.vditor-toolbar .vditor-hint {
+  background: var(--noteditor-elev) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  z-index: 10002 !important;
+}
+
+/* Dropdown içeriği opak olsun */
+.vditor-dropdown *,
+.vditor-toolbar .vditor-dropdown *,
+.vditor-toolbar .vditor-panel * {
+  background-color: transparent !important;
+}
+
+/* Dropdown liste öğeleri */
+.vditor-dropdown ul,
+.vditor-dropdown ol {
+  background: var(--noteditor-elev) !important;
+  border: 1px solid var(--noteditor-border) !important;
+  border-radius: 8px !important;
+}
+
+.vditor-dropdown li {
+  background: var(--noteditor-elev) !important;
+  color: var(--noteditor-text) !important;
+  padding: 8px 12px !important;
+}
+
+.vditor-dropdown li:hover {
+  background: rgba(125, 211, 252, 0.15) !important;
+  color: var(--noteditor-accent) !important;
+}
+
+/* Upload warning gizleme */
+.vditor-wysiwyg__upload-tips {
+  display: none !important;
+}
+
+.vditor-upload__tip {
+  display: none !important;
+}
+
+.vditor-modal input,
+.vditor-modal textarea {
+  background: var(--noteditor-panel) !important;
+  border: 1px solid var(--noteditor-border) !important;
+  color: #e9eef5 !important;
+}
+
+.vditor-modal button {
+  background: var(--noteditor-accent) !important;
+  color: #0a0d12 !important;
+  border: none !important;
+}
+
+/* Scrollbar Styles */
+.vditor-wysiwyg::-webkit-scrollbar {
+  width: 8px;
+}
+
+.vditor-wysiwyg::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+.vditor-wysiwyg::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(125, 211, 252, 0.4), rgba(125, 211, 252, 0.2));
+  border-radius: 4px;
+  border: 1px solid rgba(125, 211, 252, 0.1);
+}
+
+.vditor-wysiwyg::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(125, 211, 252, 0.6), rgba(125, 211, 252, 0.4));
+}
+
+/* Outline Scrollbar */
+.vditor-outline::-webkit-scrollbar {
+  width: 8px;
+}
+
+.vditor-outline::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(125, 211, 252, 0.4), rgba(125, 211, 252, 0.2));
+  border-radius: 4px;
+}
+
+.vditor-outline::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(125, 211, 252, 0.6), rgba(125, 211, 252, 0.4));
+}
+
+
+/* ===== ULTRA GÜÇLÜ VDITOR OVERRIDE - BEYAZ ARKAPLANI KALDIR ===== */
+.vditor {
+  background-color: var(--noteditor-panel) !important;
+  background: var(--noteditor-panel) !important;
+}
+
+.vditor-content {
+  background-color: var(--noteditor-panel) !important;
+  background: var(--noteditor-panel) !important;
+}
+
+.vditor .vditor-content {
+  background-color: var(--noteditor-panel) !important;
+  background: var(--noteditor-panel) !important;
+}
+
+.vditor-wysiwyg {
+  background-color: var(--noteditor-panel) !important;
+  background: var(--noteditor-panel) !important;
+}
+
+/* Vditor text renklerini override et */
+.vditor-wysiwyg,
+.vditor-wysiwyg p,
+.vditor-wysiwyg div,
+.vditor-wysiwyg span {
+  color: var(--noteditor-text) !important;
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Vditor content area - TÜM elementler */
+.vditor-content,
+.vditor-content > div {
+  background-color: var(--noteditor-panel) !important;
+  background: var(--noteditor-panel) !important;
+}
+
+/* Editor section da koyu olmalı */
+.note-editor-section {
+  background: var(--noteditor-panel) !important;
+}
+
+/* ===== ULTRA EXTRA OVERRIDE - EN SON DENEME ===== */
+.note-panel-container .vditor,
+.note-panel-container .vditor-content,
+.note-panel-container .vditor-wysiwyg {
+  background: var(--noteditor-panel) !important;
+  background-color: var(--noteditor-panel) !important;
+}
+
+/* TÜM .vditor içindeki her şeyi koyu yap */
+.vditor * {
+  background-color: transparent !important;
+}
+
+/* Sadece wysiwyg editörü için koyu arka plan */
+.vditor .vditor-wysiwyg {
+  background: var(--noteditor-panel) !important;
+  background-color: var(--noteditor-panel) !important;
+}
+
+/* Content div de koyu olmalı */
+.vditor .vditor-content {
+  background: var(--noteditor-panel) !important;
+}

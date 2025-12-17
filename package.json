@@ -1,0 +1,127 @@
+{
+  "name": "igo",
+  "productName": "Igo",
+  "version": "1.0.1",
+  "description": "Masaüstünde yüzen, hızlı erişimli not widget'ı. Modern tasarım ile güçlü not alma deneyimi.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "npm run clean-notes && electron-builder",
+    "build-win": "npm run clean-notes && electron-builder --win",
+    "build-portable": "npm run clean-notes && electron-builder --win portable",
+    "build-mac": "npm run clean-notes && electron-builder --mac",
+    "clean-notes": "node -e \"const fs=require('fs'); const path=require('path'); const notesDir='notes'; if(fs.existsSync(notesDir)){fs.rmSync(notesDir,{recursive:true,force:true}); fs.mkdirSync(notesDir); console.log('✅ Notes klasörü temizlendi');} else {fs.mkdirSync(notesDir); console.log('✅ Notes klasörü oluşturuldu');}\"",
+    "dist": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "build": {
+    "appId": "com.igo.app",
+    "productName": "Igo",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "nebula_canvas_desktop_widget_edition_html.html",
+      "orb.html",
+      "package.json",
+      "icon.png",
+      "assets/**/*",
+      "src/**/*",
+      "build/**/*",
+      "notes/**/*",
+      "!src/**/*.md",
+      "!**/*.log",
+      "!**/node_modules/**",
+      "!**/.git/**",
+      "!**/dist/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Igo Setup ${version}.${ext}",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Igo",
+      "uninstallDisplayName": "Igo"
+    },
+    "portable": {
+      "artifactName": "Igo Portable ${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "icon.png",
+      "artifactName": "Igo-${version}-${arch}.${ext}",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "Igo ${version}",
+      "icon": "icon.png",
+      "background": null,
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 400
+      }
+    }
+  },
+  "keywords": [
+    "widget",
+    "notes",
+    "desktop",
+    "electron",
+    "productivity",
+    "igo"
+  ],
+  "author": "Igo Team",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/cli": "^7.4.3",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/ios": "^7.4.3"
+  },
+  "devDependencies": {
+    "electron": "^37.4.0",
+    "electron-builder": "^24.13.3"
+  }
+}

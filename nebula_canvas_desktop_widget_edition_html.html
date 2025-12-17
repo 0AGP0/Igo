@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Igo — Desktop Widget Edition</title>
+<link rel="stylesheet" href="src/styles/main.css">
+<link rel="stylesheet" href="src/styles/noteditor.css">
+<!-- Vditor CSS -->
+<link rel="stylesheet" href="https://unpkg.com/vditor/dist/index.css">
+<!-- Vditor JS -->
+<script src="https://unpkg.com/vditor/dist/index.min.js"></script>
+<style>
+
+</style>
+</head>
+<body>
+  <div class="widget" id="widget">
+    <div class="top">
+      <div class="drag">
+        <div class="logo"><b>✦</b> Igo</div>
+        <div class="search">
+          <input type="text" id="q" placeholder="Ara (başlık, içerik, #etiket, [[link]])">
+        </div>
+        <div class="toolbar">
+          <button class="btn" id="toggleSidebarBtn" title="Paneli Gizle">☰</button>
+          <button class="btn" id="newBtn" title="Yeni Not">＋</button>
+          <button class="btn" id="importBtn" title="İçe Aktar">📁</button>
+          <button class="btn" id="fullscreenBtn" title="Tam Ekran">⛶</button>
+          <button class="btn" id="settingsBtn" title="Ayarlar">⚙️</button>
+          <button class="btn" id="helpBtn" title="Yardım">❓</button>
+          <button class="btn" id="closeBtn" title="Kapat">✕</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="body">
+      <!-- Sol Sidebar: Tab'lı Menü Paneli -->
+      <div class="left-sidebar">
+        <!-- Tab Headers -->
+        <div class="tabs">
+          <div class="tab active" data-tab="notes">Not Yönetimi</div>
+          <div class="tab" data-tab="tags">Etiketler</div>
+          <div class="tab" data-tab="map">Bilgi Haritası</div>
+        </div>
+        
+        <!-- Tab Content: Not Yönetimi -->
+        <div class="tab-content active" id="tab-notes">
+          <div class="folder-controls">
+            <button class="folder-btn" id="newNoteBtn" onclick="createNote();">📝 Yeni Not</button>
+            <button class="folder-btn" id="newFolderBtn" onclick="createFolder();">📁 Yeni Klasör</button>
+          </div>
+          <div class="folder-list" id="folderList">
+            <!-- Klasörler ve notlar buraya gelecek -->
+          </div>
+        </div>
+        
+        
+        <!-- Tab Content: Etiketler -->
+        <div class="tab-content" id="tab-tags">
+          <!-- Arama -->
+          <div class="tag-search">
+            <input type="text" id="tagSearch" placeholder="🔍 Etiket ara...">
+            <button class="clear-search" id="clearSearch">✕</button>
+      </div>
+      
+          <!-- Aktif Filtreler -->
+          <div class="active-filters" id="activeFilters">
+            <!-- Aktif filtreler buraya gelecek -->
+      </div>
+      
+          <!-- Etiket Kartları -->
+          <div class="tag-cards" id="tagCards">
+            <!-- Etiket kartları buraya gelecek -->
+          </div>
+        </div>
+        
+        <!-- Tab Content: Bilgi Haritası -->
+        <div class="tab-content" id="tab-map">
+          <div class="miniwrap">
+            <div class="minimap-container" id="minimap">
+              <div class="minimap-viewport">
+                <!-- Notlar ve bağlantılar buraya gelecek -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+      <!-- Sağ: Canvas -->
+      <div class="boardwrap">
+        <div class="boardbg"></div>
+        <div id="board">
+          <!-- Notlar buraya gelecek -->
+        </div>
+        <div class="zoom-info" id="zoomInfo">Zoom: 100%</div>
+        <div class="zoom-controls">
+          <button class="zoom-btn" id="zoomOutBtn">−</button>
+          <button class="zoom-btn" id="zoomInBtn">＋</button>
+          <button class="zoom-btn" id="resetZoomBtn" title="Tüm Notları Göster">⌂</button>
+        </div>
+      </div>
+    </div>
+    
+    
+    <!-- Folder Modal -->
+    <div class="modal-overlay" id="folderModal" onclick="closeFolderModal()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-title">📁 Yeni Klasör Oluştur</div>
+        <input type="text" class="modal-input" id="folderNameInput" placeholder="Klasör adını girin..." maxlength="50">
+        
+        <div class="color-picker" id="colorPicker">
+          <!-- Renkler JavaScript ile oluşturulacak -->
+        </div>
+        
+        <div class="modal-buttons">
+          <button class="modal-btn" onclick="closeFolderModal()">İptal</button>
+          <button class="modal-btn primary" onclick="confirmCreateFolder()">Oluştur</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Delete Confirmation Modal -->
+    <div class="delete-modal-overlay" id="deleteModalOverlay">
+      <div class="delete-modal">
+        <div class="delete-modal-icon">🗑️</div>
+        <div class="delete-modal-title">Notu Sil</div>
+        <div class="delete-modal-message">Bu notu silmek istediğinizden emin misiniz?</div>
+        <div class="delete-modal-note-title" id="deleteModalNoteTitle">Not Başlığı</div>
+        <div class="delete-modal-buttons">
+          <button class="delete-modal-btn cancel" onclick="closeDeleteModal()">İptal</button>
+          <button class="delete-modal-btn delete" onclick="confirmDeleteNote()">Sil</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Folder Delete Confirmation Modal -->
+    <div class="delete-modal-overlay" id="deleteFolderModalOverlay">
+      <div class="delete-modal">
+        <div class="delete-modal-icon">🗑️</div>
+        <div class="delete-modal-title">Klasörü Sil</div>
+        <div class="delete-modal-message">Bu klasörü silmek istediğinizden emin misiniz?</div>
+        <div class="delete-modal-note-title" id="deleteModalFolderTitle">Klasör Adı</div>
+        <div class="delete-modal-buttons">
+          <button class="delete-modal-btn cancel" onclick="closeDeleteFolderModal()">İptal</button>
+          <button class="delete-modal-btn delete" onclick="confirmDeleteFolder()">Sil</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Todo Delete Confirmation Modal -->
+    <div class="delete-modal-overlay" id="deleteTodoModalOverlay" onclick="closeDeleteTodoModal()">
+      <div class="delete-modal" onclick="event.stopPropagation()">
+        <div class="delete-modal-icon">🗑️</div>
+        <div class="delete-modal-title">Todo'yu Sil</div>
+        <div class="delete-modal-message">Bu todo'yu silmek istediğinizden emin misiniz?</div>
+        <div class="delete-modal-note-title" id="deleteModalTodoTitle">Todo Başlığı</div>
+        <div class="delete-modal-buttons">
+          <button class="delete-modal-btn cancel" onclick="closeDeleteTodoModal()">İptal</button>
+          <button class="delete-modal-btn delete" onclick="confirmDeleteTodo()">Sil</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Vditor Note Panel -->
+    <div class="note-panel-overlay" id="notePanelOverlay">
+      <div class="note-panel-container">
+        <div class="note-panel-header">
+          <div class="note-panel-title">
+            <span class="logo-icon">✦</span>
+            <span class="panel-title-text">Not Düzenleyici</span>
+          </div>
+          <div class="note-panel-controls">
+            <button class="panel-control-btn" id="notePanelCloseBtn" title="Kapat">✕</button>
+          </div>
+        </div>
+        
+        <div class="note-panel-content">
+          <div class="note-title-section">
+            <input 
+              type="text" 
+              class="note-panel-title-input" 
+              id="notePanelTitleInput" 
+              placeholder="Not başlığını yazın..."
+              maxlength="200"
+            />
+          </div>
+          
+          <div class="note-editor-section">
+            <div id="notePanelEditor"></div>
+          </div>
+        </div>
+        
+        <div class="note-panel-footer">
+          <div class="note-panel-stats">
+            <span id="notePanelWordCount">0 kelime</span>
+            <span id="notePanelCharCount">0 karakter</span>
+          </div>
+          <div class="note-panel-buttons">
+            <button class="note-panel-btn cancel" id="notePanelCancelBtn">İptal</button>
+            <button class="note-panel-btn save" id="notePanelSaveBtn">Kaydet</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Input Modal -->
+    <div class="modal-overlay" id="inputModal" onclick="closeInputModal()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-title" id="inputModalTitle">Başlık</div>
+        <input type="text" class="modal-input" id="inputModalInput" placeholder="Değer girin..." maxlength="100">
+        
+        <div class="modal-buttons">
+          <button class="modal-btn" onclick="closeInputModal()">İptal</button>
+          <button class="modal-btn primary" onclick="confirmInputModal()">Tamam</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Alert Modal -->
+    <div class="modal-overlay" id="alertModal" onclick="closeAlertModal()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-title" id="alertModalTitle">Bilgi</div>
+        <div class="modal-content" id="alertModalMessage" style="padding: 20px; text-align: center;"></div>
+        <div class="modal-buttons">
+          <button class="modal-btn primary" onclick="closeAlertModal()">Tamam</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Yardım Modal -->
+    <div class="modal-overlay" id="helpModal" onclick="closeHelpModal()">
+      <div class="modal help-modal" onclick="event.stopPropagation()">
+        <div class="modal-title">❓ Yardım ve Kısayollar</div>
+        
+        <div class="help-content">
+          <div class="help-section">
+            <h3>🎯 Temel İşlemler</h3>
+            <div class="help-item">
+              <strong>Tab Sistemi:</strong> Sol panelde 4 farklı görünüm
+            </div>
+            <div class="help-item">
+              <strong>📝 Not Yönetimi:</strong> Notları ve klasörleri yönetin
+            </div>
+            <div class="help-item">
+              <strong>✅ Todo Listesi:</strong> Görevleri organize edin
+            </div>
+            <div class="help-item">
+              <strong>🏷️ Etiketler:</strong> Etiketlerle filtreleme yapın
+            </div>
+            <div class="help-item">
+              <strong>🗺️ Bilgi Haritası:</strong> Bağlantıları görselleştirin
+            </div>
+            <div class="help-item">
+              <strong>Yeni Not:</strong> <kbd>Ctrl</kbd> + <kbd>N</kbd> veya <kbd>+</kbd> butonu
+            </div>
+            <div class="help-item">
+              <strong>Yeni Klasör:</strong> Sol panelde "📁 Yeni Klasör" butonu
+            </div>
+            <div class="help-item">
+              <strong>Klasörde Not Ekle:</strong> Klasöre sağ tık → "📝 Not Ekle"
+            </div>
+            <div class="help-item">
+              <strong>Yeni Todo:</strong> Todo sekmesinde "📝 Yeni Todo" butonu
+            </div>
+            <div class="help-item">
+              <strong>Arama:</strong> <kbd>Ctrl</kbd> + <kbd>F</kbd> veya arama kutusu
+            </div>
+            <div class="help-item">
+              <strong>Kaydet:</strong> <kbd>Ctrl</kbd> + <kbd>S</kbd>
+            </div>
+            <div class="help-item">
+              <strong>Not Aç:</strong> Nota çift tık
+            </div>
+          </div>
+          
+          <div class="help-section">
+            <h3>📝 Not Düzenleme (Vditor)</h3>
+            <div class="help-item">
+              <strong>Kalın:</strong> <kbd>Ctrl</kbd> + <kbd>B</kbd>
+            </div>
+            <div class="help-item">
+              <strong>İtalik:</strong> <kbd>Ctrl</kbd> + <kbd>I</kbd>
+            </div>
+            <div class="help-item">
+              <strong>Altı Çizili:</strong> <kbd>Ctrl</kbd> + <kbd>U</kbd>
+            </div>
+            <div class="help-item">
+              <strong>Üzeri Çizili:</strong> Toolbar'da strikethrough butonu
+            </div>
+            <div class="help-item">
+              <strong>Font Rengi:</strong> Toolbar'da fontColor butonu
+            </div>
+            <div class="help-item">
+              <strong>Arka Plan Rengi:</strong> Toolbar'da fontBackgroundColor butonu
+            </div>
+            <div class="help-item">
+              <strong>Font Boyutu:</strong> Toolbar'da fontSize butonu
+            </div>
+            <div class="help-item">
+              <strong>Kod Bloğu:</strong> Toolbar'da codeBlock butonu
+            </div>
+            <div class="help-item">
+              <strong>Tablo:</strong> Toolbar'da insertTable butonu
+            </div>
+            <div class="help-item">
+              <strong>Yatay Çizgi:</strong> Toolbar'da horizontalLine butonu
+            </div>
+            <div class="help-item">
+              <strong>Özel Karakterler:</strong> Toolbar'da specialCharacters butonu
+            </div>
+            <div class="help-item">
+              <strong>Format Temizle:</strong> Toolbar'da removeFormat butonu
+            </div>
+          </div>
+          
+          <div class="help-section">
+            <h3>🔗 Bağlantılar ve Etiketler</h3>
+            <div class="help-item">
+              <strong>Not Bağlantısı:</strong> <code>[[Not Adı]]</code>
+            </div>
+            <div class="help-item">
+              <strong>Etiket:</strong> <code>#etiket</code>
+            </div>
+            <div class="help-item">
+              <strong>Dış Link:</strong> <code>[Metin](URL)</code>
+            </div>
+            <div class="help-item">
+              <strong>Link Oluştur:</strong> Toolbar'da link butonu
+            </div>
+            <div class="help-item">
+              <strong>Todo Bağlantısı:</strong> Todo'lar notlarla otomatik bağlantı kurabilir
+            </div>
+            <div class="help-item">
+              <strong>Etiket Sistemi:</strong> Etiketler sekmesinde filtreleme
+            </div>
+            <div class="help-item">
+              <strong>Etiket Autocomplete:</strong> # yazarken etiket önerileri
+            </div>
+          </div>
+          
+          <div class="help-section">
+            <h3>✅ Todo Sistemi</h3>
+            <div class="help-item">
+              <strong>Yeni Todo:</strong> Todo sekmesinde "📝 Yeni Todo" butonu
+            </div>
+            <div class="help-item">
+              <strong>Todo Düzenle:</strong> Todo'ya çift tık veya sağ tık → "Düzenle"
+            </div>
+            <div class="help-item">
+              <strong>Başlık Sistemi:</strong> Todo içinde başlıklar oluşturup alt görevler ekleyin
+            </div>
+            <div class="help-item">
+              <strong>Başlık Ekle:</strong> Todo düzenleme panelinde "📝 Başlık" butonu
+            </div>
+            <div class="help-item">
+              <strong>Alt Görev Ekle:</strong> Başlık altında "+" butonuna tıklayın
+            </div>
+            <div class="help-item">
+              <strong>Öncelik Seviyeleri:</strong> Yüksek (!), Orta (•), Düşük (-)
+            </div>
+            <div class="help-item">
+              <strong>Todo Filtreleme:</strong> Öncelik ve arama ile filtreleme
+            </div>
+            <div class="help-item">
+              <strong>Todo Taşı:</strong> Todo kartını sürükle
+            </div>
+            <div class="help-item">
+              <strong>Todo Sil:</strong> Todo'ya sağ tık → "Sil"
+            </div>
+            <div class="help-item">
+              <strong>Todo Bağlantısı:</strong> Todo'lar notlarla bağlantı kurabilir
+            </div>
+            <div class="help-item">
+              <strong>Todo Renkleri:</strong> Todo'lar klasör renklerini alabilir
+            </div>
+          </div>
+          
+          <div class="help-section">
+            <h3>🎨 Klasör İşlemleri</h3>
+            <div class="help-item">
+              <strong>Renk Seç:</strong> Klasöre sağ tık → "🎨 Renk Değiştir" → Renk paletinden seç
+            </div>
+            <div class="help-item">
+              <strong>Not Taşı:</strong> Notu klasöre sürükle
+            </div>
+            <div class="help-item">
+              <strong>Klasör Sil:</strong> Klasöre sağ tık → "🗑️ Klasörü Sil"
+            </div>
+            <div class="help-item">
+              <strong>Klasör Taşı:</strong> Klasörü sürükle
+            </div>
+            <div class="help-item">
+              <strong>Alt Klasör:</strong> Klasöre sağ tık → "📁 Alt Klasör Oluştur"
+            </div>
+            <div class="help-item">
+              <strong>Klasörde Not:</strong> Klasöre sağ tık → "📝 Not Ekle"
+            </div>
+          </div>
+          
+          <div class="help-section">
+            <h3>🔗 Bağlantı Sistemi</h3>
+            <div class="help-item">
+              <strong>Bağlantı Yönetimi:</strong> Sağ tık → "🔗 Bağlantıları Yönet"
+            </div>
+            <div class="help-item">
+              <strong>Bağlantı Türleri:</strong> Not-Not, Not-Todo, Klasör-Not, Todo-Klasör
+            </div>
+            <div class="help-item">
+              <strong>Görsel Çizgiler:</strong> Canvas'ta renkli bağlantı çizgileri
+            </div>
+            <div class="help-item">
+              <strong>Modal Arayüz:</strong> Arama ve filtreleme ile kolay yönetim
+            </div>
+            <div class="help-item">
+              <strong>Not-Not:</strong> Wikilink sistemi ile [[Not Adı]]
+            </div>
+            <div class="help-item">
+              <strong>Not-Todo:</strong> Bağlantı modal'ında not-todo bağlantısı
+            </div>
+            <div class="help-item">
+              <strong>Klasör Bağlantıları:</strong> Notları ve todo'ları klasörlere bağlama
+            </div>
+            <div class="help-item">
+              <strong>Bağlantı Renkleri:</strong> Her bağlantı türü farklı renkte çizgiler
+            </div>
+          </div>
+          
+          <div class="help-section">
+            <h3>🗺️ Harita Modu (Bilgi Haritası)</h3>
+            <div class="help-item">
+              <strong>Canvas Görünümü:</strong> Notları ve todo'ları canvas'ta düzenleyin
+            </div>
+            <div class="help-item">
+              <strong>Zoom In:</strong> <kbd>Ctrl</kbd> + <kbd>+</kbd> veya <kbd>Ctrl</kbd> + Mouse Wheel Up
+            </div>
+            <div class="help-item">
+              <strong>Zoom Out:</strong> <kbd>Ctrl</kbd> + <kbd>-</kbd> veya <kbd>Ctrl</kbd> + Mouse Wheel Down
+            </div>
+            <div class="help-item">
+              <strong>Pan (Kaydır):</strong> Orta tuş + sürükle veya Mouse Wheel
+            </div>
+            <div class="help-item">
+              <strong>Sağ Tık Menü:</strong> Haritada sağ tık → Context menü
+            </div>
+            <div class="help-item">
+              <strong>Tüm Notları Gör:</strong> Zoom reset butonu
+            </div>
+            <div class="help-item">
+              <strong>Bağlantı Çizgileri:</strong> Otomatik olarak tüm bağlantılar çizilir
+            </div>
+            <div class="help-item">
+              <strong>Todo Canvas:</strong> Todo'ları canvas'ta düzenleyin
+            </div>
+          </div>
+          
+          <div class="help-section">
+            <h3>🖱️ Mouse İşlemleri</h3>
+            <div class="help-item">
+              <strong>Not Taşı:</strong> Notu sürükle
+            </div>
+            <div class="help-item">
+              <strong>Todo Taşı:</strong> Todo kartını sürükle
+            </div>
+            <div class="help-item">
+              <strong>Klasör Taşı:</strong> Klasör kartını sürükle
+            </div>
+            <div class="help-item">
+              <strong>Not Boyutlandır:</strong> Notun köşesinden sürükle
+            </div>
+            <div class="help-item">
+              <strong>Çoklu Seçim:</strong> Boş alanda sürükle (selection box) - Not, Klasör ve Todo kartları
+            </div>
+            <div class="help-item">
+              <strong>Toplu Taşıma:</strong> Çoklu seçim yap → Herhangi bir seçili kartı sürükle
+            </div>
+            <div class="help-item">
+              <strong>Not Sağ Tık:</strong> Context menü (klasör değiştir, sil)
+            </div>
+            <div class="help-item">
+              <strong>Klasör Sağ Tık:</strong> Context menü (not ekle, renk değiştir, sil)
+            </div>
+            <div class="help-item">
+              <strong>Todo Sağ Tık:</strong> Context menü (düzenle, sil)
+            </div>
+          </div>
+          
+          <div class="help-section">
+            <h3>⌨️ Klavye Kısayolları</h3>
+            <div class="help-item">
+              <strong>Widget Aç/Kapat:</strong> <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>W</kbd>
+            </div>
+            <div class="help-item">
+              <strong>Yardım:</strong> <kbd>F1</kbd> veya <kbd>?</kbd>
+            </div>
+            <div class="help-item">
+              <strong>Çıkış:</strong> <kbd>Ctrl</kbd> + <kbd>Q</kbd>
+            </div>
+            <div class="help-item">
+              <strong>Not Panel Kapat:</strong> <kbd>ESC</kbd>
+            </div>
+            <div class="help-item">
+              <strong>Modal Kapat:</strong> <kbd>ESC</kbd>
+            </div>
+          </div>
+          
+          <div class="help-section">
+            <h3>📊 Özel Özellikler</h3>
+            <div class="help-item">
+              <strong>Pozisyon Koruma:</strong> Notların, klasörlerin ve todo'ların pozisyonları otomatik kaydedilir
+            </div>
+            <div class="help-item">
+              <strong>Dosya İzleme:</strong> Notes klasöründeki değişiklikler otomatik algılanır
+            </div>
+            <div class="help-item">
+              <strong>Multi-Selection:</strong> Birden fazla kart seçip toplu işlem yapabilirsiniz (Not, Klasör, Todo)
+            </div>
+            <div class="help-item">
+              <strong>Drag & Drop:</strong> Notları klasörler arası taşıyabilirsiniz
+            </div>
+            <div class="help-item">
+              <strong>Wikilink Autocomplete:</strong> [[ yazarken not önerileri gelir
+            </div>
+            <div class="help-item">
+              <strong>Tag Autocomplete:</strong> # yazarken etiket önerileri gelir
+            </div>
+            <div class="help-item">
+              <strong>Klasör Renkleri:</strong> Klasörlere sağ tık → Renk değiştir
+            </div>
+            <div class="help-item">
+              <strong>Alt Klasörler:</strong> Klasörlere alt klasör ekleyebilirsiniz
+            </div>
+            <div class="help-item">
+              <strong>Todo Sistemi:</strong> Todo kartları oluşturup yönetebilirsiniz
+            </div>
+            <div class="help-item">
+              <strong>Todo Subtask:</strong> Todo'lara alt görevler ekleyebilirsiniz
+            </div>
+            <div class="help-item">
+              <strong>Todo Bağlantıları:</strong> Todo'lar notlarla bağlantı kurabilir
+            </div>
+            <div class="help-item">
+              <strong>Bağlantı Modal:</strong> Gelişmiş bağlantı yönetimi arayüzü
+            </div>
+            <div class="help-item">
+              <strong>Canvas Görünümü:</strong> Notları ve todo'ları canvas'ta düzenleme
+            </div>
+            <div class="help-item">
+              <strong>Bilgi Haritası:</strong> Bağlantıları görselleştirme
+            </div>
+            <div class="help-item">
+              <strong>Tab Sistemi:</strong> 4 farklı görünüm modu
+            </div>
+            <div class="help-item">
+              <strong>Todo Başlık Sistemi:</strong> Todo içinde başlıklar ve alt görevler
+            </div>
+            <div class="help-item">
+              <strong>Zoom Popup:</strong> Düşük zoom seviyelerinde kart isimleri popup olarak görünür
+            </div>
+            <div class="help-item">
+              <strong>Anlık Widget Açılma:</strong> Orb'a tıklayınca widget anında açılır
+            </div>
+            <div class="help-item">
+              <strong>Pozisyon Kaydetme:</strong> Widget pozisyonu otomatik kaydedilir
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-buttons">
+          <button class="modal-btn primary" onclick="closeHelpModal()">Tamam</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Basit Ayarlar Modal -->
+    <div class="modal-overlay" id="settingsModal" onclick="closeSettingsModal()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-title">⚙️ Ayarlar</div>
+        
+        <div class="modal-content settings-content">
+          <div class="setting-item">
+            <label class="setting-label">
+              <input type="checkbox" id="alwaysOnTopCheckbox" onchange="toggleAlwaysOnTop()">
+              <span class="setting-text">Her zaman üstte kal</span>
+            </label>
+          </div>
+          
+          <div class="setting-item">
+            <button class="setting-action-btn" onclick="centerAllCards(); closeSettingsModal();">
+              <span class="setting-icon">📐</span>
+              <span class="setting-text">Kartları Ortala</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- Core Modules -->
+<script src="src/scripts/core/constants.js"></script>
+<script src="src/scripts/core/dom.js"></script>
+<script src="src/scripts/core/storage.js"></script>
+<script src="src/scripts/core/state.js"></script>
+<script src="src/scripts/core/settings.js"></script>
+
+<!-- Utils Modules (helpers önce yüklenmeli - dataLoader'da kullanılıyor) -->
+<script src="src/scripts/utils/helpers.js"></script>
+<script src="src/scripts/utils/folderMatch.js"></script>
+<script src="src/scripts/utils/markdown.js"></script>
+<script src="src/scripts/utils/fileOperations.js"></script>
+<script src="src/scripts/utils/noteUtils.js"></script>
+
+<!-- Core Data Loader (helpers'dan sonra yüklenmeli) -->
+<script src="src/scripts/core/dataLoader.js"></script>
+
+<!-- Manager Modules -->
+<script src="src/scripts/managers/selectionManager.js"></script>
+<script src="src/scripts/managers/multiSelection.js"></script>
+<script src="src/scripts/managers/noteManager.js"></script>
+<script src="src/scripts/managers/folderManager.js"></script>
+<script src="src/scripts/managers/folderOperations.js"></script>
+<script src="src/scripts/managers/tagManager.js"></script>
+
+<!-- UI Modules -->
+<script src="src/scripts/ui/notifications.js"></script>
+<script src="src/scripts/ui/titlePopup.js"></script>
+<script src="src/scripts/ui/contextMenu.js"></script>
+<script src="src/scripts/ui/modals.js"></script>
+<script src="src/scripts/ui/tutorial.js"></script>
+<script src="src/scripts/ui/connectionModal.js"></script>
+<script src="src/scripts/ui/widget.js"></script>
+<script src="src/scripts/ui/sidebar.js"></script>
+<script src="src/scripts/ui/minimap.js"></script>
+
+<!-- Canvas Modules -->
+<script src="src/scripts/canvas/zoom.js"></script>
+<script src="src/scripts/canvas/boardOperations.js"></script>
+<script src="src/scripts/canvas/folderRender.js"></script>
+<script src="src/scripts/canvas/edgeIndicators.js"></script>
+<script src="src/scripts/canvas/resize.js"></script>
+<script src="src/scripts/canvas/dragDrop.js"></script>
+<script src="src/scripts/canvas/noteRender.js"></script>
+<script src="src/scripts/canvas/connections.js"></script>
+
+<!-- Editor Modules -->
+<script src="src/scripts/editor/preview.js"></script>
+<script src="src/scripts/editor/notePanel.js"></script>
+
+<!-- Event Modules -->
+<script src="src/scripts/events/domEvents.js"></script>
+
+<!-- Main Scripts -->
+
+<!-- Systems (son yüklenmeli - event listeners) -->
+<script src="src/scripts/core/electron.js"></script>
+<script src="src/scripts/core/saveSystem.js"></script>
+<script src="src/scripts/core/keyboard.js"></script>
+<script>
+// Widget için basit fonksiyonlar
+// Widget için createNote fonksiyonu (sonsuz döngüyü önlemek için farklı isim)
+function createNoteWidget() {
+  // Ana uygulamadaki createNote fonksiyonunu çağır
+  try {
+    if (typeof window.createNote === 'function') {
+      window.createNote();
+    } else {
+      console.log('createNote fonksiyonu bulunamadı');
+    }
+  } catch (error) {
+    console.error('createNote çağrısında hata:', error);
+  }
+}
+
+// Global createNoteMain fonksiyonu (context menu için)
+window.createNoteMain = function() {
+  createNoteWidget();
+};
+
+// Widget için createFolder fonksiyonu (sonsuz döngüyü önlemek için farklı isim)
+function createFolderWidget() {
+  // Ana uygulamadaki createFolder fonksiyonunu çağır
+  try {
+    if (typeof window.createFolder === 'function') {
+      window.createFolder();
+    } else {
+      console.log('createFolder fonksiyonu bulunamadı');
+    }
+  } catch (error) {
+    console.error('createFolder çağrısında hata:', error);
+  }
+}
+
+// Global createFolderMain fonksiyonu (context menu için)
+window.createFolderMain = function() {
+  createFolderWidget();
+};
+</script>
+</body>
+</html>

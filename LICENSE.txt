@@ -1,0 +1,19 @@
+IGO LİSANS SÖZLEŞMESİ
+
+Bu yazılım MIT lisansı altında dağıtılmaktadır.
+
+KULLANIM KOŞULLARI:
+- Bu yazılımı kişisel ve ticari amaçlarla kullanabilirsiniz
+- Yazılımı değiştirebilir ve dağıtabilirsiniz
+- Kaynak kodunu inceleyebilir ve öğrenebilirsiniz
+
+SORUMLULUK REDDİ:
+- Bu yazılım "olduğu gibi" sağlanmaktadır
+- Yazılımın kullanımından doğabilecek zararlardan geliştiriciler sorumlu değildir
+- Veri kaybı riski kullanıcının sorumluluğundadır
+
+DESTEK:
+- Sorularınız için: igo@example.com
+- Hata bildirimleri için GitHub Issues kullanın
+
+© 2025 Igo Team. Tüm hakları saklıdır.
