@@ -34,58 +34,57 @@ Modern ve şık masaüstü not widget'ı. Electron ile geliştirilmiş, güçlü
 
 ## 🚀 Kurulum
 
-### 📦 Hazır Build Dosyaları (Önerilen)
+### Windows için Build Oluşturma
 
-**En son sürümü indirmek için:**
-1. [Releases sayfasına](https://github.com/0AGP0/Igo/releases) gidin
-2. En son release'i seçin
-3. İşletim sisteminize uygun dosyayı indirin:
-   - **Windows**: `Igo Setup 1.0.1.exe` (Kurulum) veya `Igo Portable 1.0.1.exe` (Portable)
-   - **macOS**: `Igo-1.0.1-x64.dmg` (Intel Mac) veya `Igo-1.0.1-arm64.dmg` (Apple Silicon)
+1. **Projeyi klonlayın:**
+   ```bash
+   git clone https://github.com/0AGP0/Igo.git
+   cd Igo
+   ```
 
-**Windows Kurulum:**
-1. `Igo Setup 1.0.1.exe` dosyasını çalıştırın
-2. Kurulum sihirbazını takip edin
-3. Masaüstü kısayolundan veya başlat menüsünden çalıştırın
+2. **Bağımlılıkları yükleyin:**
+   ```bash
+   npm install
+   ```
 
-**macOS Kurulum:**
-1. `.dmg` dosyasını indirin ve açın
-2. Igo uygulamasını Applications klasörüne sürükleyin
-3. İlk açılışta "Geliştiricisi doğrulanamadı" uyarısı çıkabilir
-4. Sistem Ayarları > Güvenlik ve Gizlilik > "Yine de Aç" butonuna tıklayın
+3. **Windows build oluşturun:**
+   ```bash
+   npm run build-win
+   ```
 
-### 💻 Geliştirme için Kurulum
+4. **Build dosyaları:**
+   - Build tamamlandıktan sonra `dist/` klasöründe şu dosyalar oluşur:
+     - `Igo Setup 1.0.1.exe` - Kurulum dosyası
+     - `Igo Portable 1.0.1.exe` - Portable versiyon
 
-Projeyi geliştirmek veya kaynak kodundan çalıştırmak için:
+5. **Kurulum:**
+   - `Igo Setup 1.0.1.exe` dosyasını çalıştırın
+   - Kurulum sihirbazını takip edin
+   - Masaüstü kısayolundan veya başlat menüsünden çalıştırın
 
-```bash
-# Repository'yi klonlayın
-git clone https://github.com/0AGP0/Igo.git
-cd Igo
+### macOS için Build Oluşturma
 
-# Bağımlılıkları yükleyin
-npm install
+**Not:** macOS build için macOS işletim sistemi gereklidir.
 
-# Geliştirme modunda çalıştırın
-npm start
+1. **Projeyi klonlayın:**
+   ```bash
+   git clone https://github.com/0AGP0/Igo.git
+   cd Igo
+   ```
 
-# Veya dev modunda
-npm run dev
-```
+2. **Bağımlılıkları yükleyin:**
+   ```bash
+   npm install
+   ```
 
-**Build Oluşturma:**
-```bash
-# Windows build
-npm run build-win
+3. **macOS build oluşturun:**
+   ```bash
+   npm run build-mac
+   ```
 
-# macOS build (macOS gerektirir)
-npm run build-mac
-
-# Tüm platformlar
-npm run build
-```
-
-Build dosyaları `dist/` klasöründe oluşur.
+4. **Build dosyaları:**
+   - Build tamamlandıktan sonra `dist/` klasöründe `.dmg` dosyası oluşur
+   - `.dmg` dosyasını açın ve Igo uygulamasını Applications klasörüne sürükleyin
 
 ## 📖 Kullanım
 
@@ -196,13 +195,6 @@ Gelecek güncellemeler:
 ## 📄 Lisans
 
 MIT License - Özgürce kullanabilir, değiştirebilir ve dağıtabilirsiniz.
-
-## 📦 Otomatik Build Sistemi
-
-Bu proje GitHub Actions kullanarak otomatik build yapmaktadır:
-- Her release oluşturulduğunda otomatik olarak Windows ve macOS build'leri oluşturulur
-- Build dosyaları release sayfasında otomatik olarak yayınlanır
-- [Actions sayfasından](https://github.com/0AGP0/Igo/actions) build durumunu takip edebilirsiniz
 
 ## 👥 Destek
 
