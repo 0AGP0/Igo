@@ -34,57 +34,12 @@ Modern ve şık masaüstü not widget'ı. Electron ile geliştirilmiş, güçlü
 
 ## 🚀 Kurulum
 
-### Windows için Build Oluşturma
+1. **Setup Dosyası**: `Igo Setup 1.0.1.exe` dosyasını çalıştırın
+2. **Kurulum**: Kurulum sihirbazını takip edin
+3. **Başlatın**: Masaüstü kısayolundan veya başlat menüsünden çalıştırın
 
-1. **Projeyi klonlayın:**
-   ```bash
-   git clone https://github.com/0AGP0/Igo.git
-   cd Igo
-   ```
-
-2. **Bağımlılıkları yükleyin:**
-   ```bash
-   npm install
-   ```
-
-3. **Windows build oluşturun:**
-   ```bash
-   npm run build-win
-   ```
-
-4. **Build dosyaları:**
-   - Build tamamlandıktan sonra `dist/` klasöründe şu dosyalar oluşur:
-     - `Igo Setup 1.0.1.exe` - Kurulum dosyası
-     - `Igo Portable 1.0.1.exe` - Portable versiyon
-
-5. **Kurulum:**
-   - `Igo Setup 1.0.1.exe` dosyasını çalıştırın
-   - Kurulum sihirbazını takip edin
-   - Masaüstü kısayolundan veya başlat menüsünden çalıştırın
-
-### macOS için Build Oluşturma
-
-**Not:** macOS build için macOS işletim sistemi gereklidir.
-
-1. **Projeyi klonlayın:**
-   ```bash
-   git clone https://github.com/0AGP0/Igo.git
-   cd Igo
-   ```
-
-2. **Bağımlılıkları yükleyin:**
-   ```bash
-   npm install
-   ```
-
-3. **macOS build oluşturun:**
-   ```bash
-   npm run build-mac
-   ```
-
-4. **Build dosyaları:**
-   - Build tamamlandıktan sonra `dist/` klasöründe `.dmg` dosyası oluşur
-   - `.dmg` dosyasını açın ve Igo uygulamasını Applications klasörüne sürükleyin
+### Portable Versiyon
+Kurulum gerektirmeyen portable versiyonu da mevcuttur: `Igo Portable 1.0.1.exe`
 
 ## 📖 Kullanım
 
@@ -144,11 +99,10 @@ Modern ve şık masaüstü not widget'ı. Electron ile geliştirilmiş, güçlü
 
 ## 🔧 Sistem Gereksinimleri
 
-- **OS**: Windows 10/11 (64-bit) veya macOS 10.13+
+- **OS**: Windows 10/11 (64-bit)
 - **RAM**: Minimum 4GB
 - **Disk**: 200MB boş alan
 - **Display**: 1366x768 minimum çözünürlük
-- **Node.js**: Geliştirme için Node.js 20+ (sadece build için gerekli)
 
 ## 📂 Dosya Konumları
 

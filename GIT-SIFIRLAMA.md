@@ -55,3 +55,6 @@ Bu işlemden sonra:
 - Temiz bir git geçmişi olacak
 - Sadece gerekli dosyalar gönderilecek
 - Push çok daha hızlı olacak
+
+
+

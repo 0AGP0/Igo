@@ -1,13 +1,13 @@
 # Node modules
 node_modules/
 
-# Build outputs
+# Build outputs - GitHub Actions'da build yapılacak, dist/ klasörüne gerek yok
 dist/
 
 # User notes - kişisel notlar, repo'ya gerek yok
 notes/
 
-# Electron binaries
+# Electron binaries - build dosyaları GitHub Actions'da oluşturulacak
 *.exe
 
 # OS generated files
@@ -62,7 +62,7 @@ jspm_packages/
 # Electron-builder output
 /dist_electron/
 
-# macOS build outputs
+# macOS build outputs - GitHub Actions'da oluşturulacak
 *.dmg
 *.pkg
 *.app
